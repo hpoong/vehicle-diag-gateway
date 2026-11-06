@@ -1,7 +1,7 @@
 # Vehicle Diagnostic Gateway
 
 차량 진단 결과 연계 gateway의 Java 17 초기 프로젝트입니다.
-[전체 설계](temp/설계/00_전체_설계.md), [문서 가이드](docs/README.md), [아키텍처](docs/architecture/overview.md), [DB 설계](docs/db/README.md), [개발 컨벤션](docs/convention/conventions.md)을 기준으로 구성했습니다.
+[문서 가이드](docs/README.md), [아키텍처](docs/architecture/overview.md), [DB 설계](docs/db/README.md), [개발 컨벤션](docs/convention/conventions.md)을 기준으로 구성했습니다.
 
 ## 기술 및 구조
 

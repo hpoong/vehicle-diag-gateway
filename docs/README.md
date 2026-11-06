@@ -19,8 +19,12 @@ docs/
 │   ├── gateway-db.md              # Gateway DB 설계 (6개 테이블, SKIP LOCKED 선점)
 │   └── receiver-db.md             # Receiver DB 설계 (3개 테이블, 멱등 반영, S12 대조군)
 │
-└── convention/                    # 📏 개발 표준 및 컨벤션
-    └── conventions.md             # 코딩 규칙, API/에러 규격, SQL/Flyway, Git 커밋
+├── convention/                    # 📏 개발 표준 및 컨벤션
+│   └── conventions.md             # 코딩 규칙, API/에러 규격, SQL/Flyway, Git 커밋
+│
+└── plan/                          # 📝 세부 기능 구현 계획
+    └── gateway/
+        └── in-02-error-response.md # IN-02 공통 오류 응답 (RFC 9457) 구현 계획
 ```
 
 ---
@@ -52,4 +56,10 @@ docs/
   - HTTP 상태 코드 규약 (`200`, `202`, `409`, `422`) 및 Problem Details 포맷
   - PostgreSQL & MyBatis SQL 작성 수칙 및 제약조건 네이밍
   - Testcontainers 기반 통합 테스트 및 Conventional Commits 규약
+
+### 4. 구현 계획 ([`plan/`](plan/))
+- [**IN-02 공통 오류 응답 (RFC 9457) 구현 계획 (`plan/gateway/in-02-error-response.md`)**](plan/gateway/in-02-error-response.md)
+  - `BusinessException` 확장 속성(`policyCode` 등) 지원 및 예약 키 충돌 방지
+  - DB 연결 장애 시 `503 Service Unavailable` 변환 및 `GatewayExceptionAdvice` 설계
+
 

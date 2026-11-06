@@ -8,6 +8,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.util.UUID;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -109,6 +112,17 @@ class WebSupportIT {
     }
 
     @Test
+    void shouldExposeCustomPropertiesAndRejectReservedNames() throws Exception {
+        mvc.perform(get("/test/policy"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.policyCode").value("X"));
+        for (String name : List.of("type", "title", "status", "detail", "instance", "errors", "requestId")) {
+            assertThatIllegalArgumentException().isThrownBy(
+                    () -> new BusinessException(CommonErrorCode.NOT_FOUND, List.of(), Map.of(name, 1)));
+        }
+    }
+
+    @Test
     void shouldHideInternalDetailsAndReplaceInvalidRequestId_whenUnexpectedException() throws Exception {
         var result = mvc.perform(get("/test/unexpected").header(RequestIdFilter.HEADER, "invalid-id"))
                 .andExpect(status().isInternalServerError())
@@ -142,6 +156,11 @@ class WebSupportIT {
         @GetMapping("/test/business")
         void business() {
             throw new BusinessException(CommonErrorCode.NOT_FOUND);
+        }
+
+        @GetMapping("/test/policy")
+        void policy() {
+            throw new BusinessException(CommonErrorCode.CONFLICT, List.of(), Map.of("policyCode", "X"));
         }
 
         @GetMapping("/test/unexpected")

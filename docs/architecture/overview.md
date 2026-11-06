@@ -1,7 +1,7 @@
 # 프로젝트 아키텍처 및 구성 요소 명세
 
 > **문서 상태**: v1.1 (2026-11-06, 5일 범위 축소 반영)  
-> **관련 문서**: [02-toy-project-scenario.md](../../temp/02-toy-project-scenario.md), [00_전체_설계.md](../../temp/설계/00_전체_설계.md)
+> **관련 문서**: [web-support.md](web-support.md), [DB 설계](../db/README.md), [개발 컨벤션](../convention/conventions.md)
 
 이 문서는 **차량 진단 결과 연계 게이트웨이(vehicle-diag-gateway)** 프로젝트를 구성하는 애플리케이션(Spring Boot 2개), 시나리오 테스트, 데이터베이스의 역할과 협력 관계를 설명합니다.
 
@@ -68,7 +68,7 @@ flowchart LR
 | **처리 중 종료 모사** | 선점 후 전송 생략 + lease 만료 | 실제 프로세스 종료 없이 S7을 재현한다 |
 | **정합성 대조** | `ReconcileAssertions` | 두 DB를 읽어 불변식 I1~I6과 중복 반영 수(DUP1)를 판정한다 |
 
-검증하는 시나리오: S1 재전송, S2 충돌, S3 지연 도착, S4 수신 서버 중단, S5 응답 유실, S7 처리 중 종료, S8 동시 선점, S9 lease 초과(stale claim), S10 최대 시도 초과 후 수동 재처리, S12 중복 검사 없는 비교 실험. 상세는 [04_운영_검증_설계.md](../tmep/설계/04_운영_검증_설계.md).
+검증하는 시나리오: S1 재전송, S2 충돌, S3 지연 도착, S4 수신 서버 중단, S5 응답 유실, S7 처리 중 종료, S8 동시 선점, S9 lease 초과(stale claim), S10 최대 시도 초과 후 수동 재처리, S12 중복 검사 없는 비교 실험.
 
 ---
 
@@ -101,11 +101,8 @@ vehicle-diag-gateway/
 │  │  └─ web-support.md      # 공통 웹 모듈 명세
 │  ├─ db/                    # DB 설계 명세 및 정합성 설계 (gateway-db, receiver-db)
 │  ├─ convention/            # 개발 표준 및 컨벤션 (conventions.md)
+│  ├─ plan/                  # 세부 기능 구현 계획
 │  └─ results.md             # 시나리오 수행 결과 (5일차 작성)
-├─ temp/                     # 사전 기획 및 상세 설계
-│  ├─ 01-resume-content.md
-│  ├─ 02-toy-project-scenario.md
-│  └─ 설계/
 └─ docker-compose.yml        # 로컬 PostgreSQL
 ```
 
