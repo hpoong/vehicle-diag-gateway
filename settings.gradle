@@ -1,0 +1,4 @@
+rootProject.name = 'vehicle-diag-gateway'
+
+include 'web-support', 'gateway'
+// receiver가 추가되면 include 'receiver'를 선언한다.
