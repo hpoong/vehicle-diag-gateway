@@ -101,3 +101,9 @@ docs/
 - [IN-12 결과 조회](plan/gateway/01-ingest-design/in-12-result-query.md)
 - [일반 설명용 HTML 슬라이드 (9장)](flow/gateway-overview.html)
 - [개발자용 HTML 슬라이드 (13장)](flow/gateway-developer.html)
+
+### 6. Receiver 기능과 발표 자료
+
+- [RC-01~10 구현 현황 및 검증 기록](plan/receiver/03-receiver-design/README.md)
+- [Receiver 일반 설명용 슬라이드](flow/receiver-overview.html): 품질 건 반영, 재전송·응답 유실, 장애 모드와 naive 비교
+- [Receiver 개발자용 슬라이드](flow/receiver-developer.html): API·검증·hash, 원자적 저장과 동시성, 장애 주입·로그·실행·검증

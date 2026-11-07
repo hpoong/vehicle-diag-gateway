@@ -11,7 +11,7 @@ Gateway로부터 품질 이벤트를 수신하여 **멱등성(Idempotency)**을 
 
 ```mermaid
 erDiagram
-    RECEIVED_EVENT ||--o{ QUALITY_CASE : "applies (event_id, vin)"
+    RECEIVED_EVENT ||--o{ QUALITY_CASE : "applies (event_id)"
     RECEIVED_EVENT {
         uuid event_id PK "게이트웨이 이벤트 식별자"
         char64 payload_hash "SHA-256 검증 해시"
@@ -22,8 +22,8 @@ erDiagram
     }
     QUALITY_CASE {
         bigserial id PK
-        uuid event_id "복합 FK"
-        varchar17 vin "복합 FK"
+        uuid event_id FK "수신 이벤트 참조"
+        varchar17 vin "요청 차대번호"
         varchar30 ecu_id "UNIQUE(event_id, ecu_id, dtc_code)"
         varchar30 sw_version
         varchar10 dtc_code
@@ -56,7 +56,7 @@ erDiagram
 - 이벤트 1건에 포함된 (ECU, DTC) 쌍마다 1행씩 생성되는 실질적인 품질 데이터입니다.
 - **핵심 제약**:
   - `uq_case_event_ecu_dtc`: 동일 이벤트 내에서 같은 ECU, 동일 고장코드가 중복 생성되지 않도록 보장 (`UNIQUE(event_id, ecu_id, dtc_code)`).
-  - 복합 외래키: `(event_id, vin)`을 `received_event(event_id, vin)`과 결합하여 데이터 정합성 보장.
+  - 외래키: `event_id`가 `received_event(event_id)`를 참조합니다. `vin`은 요청에서 함께 저장합니다.
 
 ### 2.3. `quality_case_naive` (비교 실험 S12 전용 대조군 테이블)
 - **설계 목적**: "만약 수신 서버에 멱등 방어 장치가 없다면 실제로 중복이 발생하는가?"를 증명하기 위한 비교 실험용 테이블입니다.
@@ -92,6 +92,6 @@ VALUES (...);
 
 | 시나리오 | 조건 | 정상 설계 (`quality_case`) | 대조군 (`quality_case_naive`) |
 |---|---|---|---|
-| **S5 (응답 유실)** | `DROP_AFTER_COMMIT` (수신 서버가 DB 커밋 후 네트워크 강제 종료) | 게이트웨이가 타임아웃으로 재전송하더라도 **중복 반영 0건** (기존 이벤트 인정) | — |
+| **S5 (응답 유실)** | `DROP_AFTER_COMMIT` (수신 서버가 DB 커밋 후 응답을 보류하여 클라이언트 타임아웃 유도) | 게이트웨이가 타임아웃으로 재전송하더라도 **중복 반영 0건** (기존 이벤트 인정) | — |
 | **S12 (비교 실험)** | 멱등 장치가 없는 시스템에 동일한 재전송 발생 | — | **동일 이벤트의 데이터가 중복으로 쌓임 (N건 초과)** |
 

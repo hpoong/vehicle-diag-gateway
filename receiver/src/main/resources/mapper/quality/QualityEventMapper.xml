@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hopoong.diag.receiver.quality.persistence.QualityEventMapper">
+    <select id="insertReceived" resultType="string" affectData="true" flushCache="true">
+        INSERT INTO received_event (event_id, payload_hash, source_result_id, vin, case_count)
+        VALUES (#{eventId}::uuid, #{payloadHash}, #{sourceResultId}, #{vin}, #{caseCount})
+        ON CONFLICT (event_id) DO NOTHING RETURNING event_id::text
+    </select>
+    <resultMap id="received" type="com.hopoong.diag.receiver.quality.persistence.ReceivedEventRow">
+        <constructor>
+            <arg column="payload_hash" javaType="java.lang.String"/>
+            <arg column="case_count" javaType="_int"/>
+        </constructor>
+    </resultMap>
+    <select id="findReceived" resultMap="received">
+        SELECT payload_hash, case_count FROM received_event WHERE event_id = #{eventId}::uuid
+    </select>
+    <insert id="insertCases">
+        INSERT INTO quality_case (event_id, vin, ecu_id, sw_version, dtc_code, occurred_at) VALUES
+        <foreach collection="cases" item="c" separator=",">
+            (#{eventId}::uuid, #{vin}, #{c.ecuId}, #{c.swVersion}, #{c.dtcCode}, #{occurredAt})
+        </foreach>
+    </insert>
+    <insert id="insertNaiveCases">
+        INSERT INTO quality_case_naive (event_id, ecu_id, dtc_code) VALUES
+        <foreach collection="cases" item="c" separator=",">
+            (#{eventId}::uuid, #{c.ecuId}, #{c.dtcCode})
+        </foreach>
+    </insert>
+</mapper>

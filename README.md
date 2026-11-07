@@ -8,7 +8,7 @@
 - Java 17, Spring Boot 3.5.16, Gradle Wrapper 8.14.3
 - Spring MVC, Bean Validation, MyBatis 3.0.5, Flyway, PostgreSQL 16, Actuator
 - `gateway/`: 독립 실행 Spring Boot 애플리케이션
-- `receiver/`: 독립 실행 Spring Boot 애플리케이션 기본 뼈대 (업무 로직·DB 연동 없음)
+- `receiver/`: 품질 이벤트 멱등 수신·장애 주입용 독립 Spring Boot 애플리케이션
 - `web-support/`: 두 서비스가 재사용하는 일반 JAR (응답, 예외, 요청 ID 추적)
 - `ingest`, `policy`, `delivery`, `ops`, `common`: 설계 책임별 패키지
 - `gateway/src/main/resources/db/migration/`: 수신·outbox·운영 감사 테이블
@@ -16,8 +16,10 @@
 진단 결과 수신·정규화·중복 판정·공통/브랜드 검증·원자적 저장·최신 상태 갱신·outbox 예약·결과 조회를 구현했습니다.
 [수신 기능 구현 현황](docs/plan/gateway/01-ingest-design/README.md)에서 단계별 동작과 검증 기록을 확인할 수 있습니다.
 [일반 설명용](docs/flow/gateway-overview.html)과 [개발자용](docs/flow/gateway-developer.html) 슬라이드 HTML을 제공합니다.
+Receiver도 [일반 설명용](docs/flow/receiver-overview.html)과 [개발자용](docs/flow/receiver-developer.html) 슬라이드 HTML을 제공합니다.
 outbox 전송 워커와 운영 API는 후속 구현 대상입니다.
-receiver의 업무 기능과 시나리오 테스트(JUnit + Testcontainers, 정합성 대조 포함)는 후속 단계에서 구성합니다.
+receiver는 품질 이벤트 검증·중복 제거와 장애 주입, naive 비교 모드를 제공합니다.
+[receiver 구현 현황](docs/plan/receiver/03-receiver-design/README.md)에서 API와 검증 범위를 확인할 수 있습니다.
 
 ## 로컬 실행
 
@@ -55,7 +57,8 @@ docker compose up -d --wait postgres
 Compose의 `POSTGRES_PORT`를 변경하면 `GATEWAY_DB_URL`도 같은 포트로 맞춥니다.
 Compose의 비밀번호 설정은 빈 데이터 볼륨을 최초 초기화할 때 적용됩니다.
 
-receiver는 DB 없이 별도 터미널에서 실행합니다.
+receiver는 별도 `receiver` DB를 사용하며, 별도 터미널에서 실행합니다.
+빈 PostgreSQL 볼륨의 최초 초기화 시 Compose init 스크립트가 receiver 계정과 DB를 생성합니다.
 
 ```powershell
 # Windows (PowerShell)
@@ -68,7 +71,27 @@ receiver는 DB 없이 별도 터미널에서 실행합니다.
 ```
 
 상태 확인: `http://localhost:8081/actuator/health`
-환경변수 `RECEIVER_PORT`로 포트를 변경할 수 있습니다.
+기본 DB는 `localhost:5432/receiver`, 계정은 `receiver`, 로컬 비밀번호는 `receiver-local`입니다.
+환경변수 `RECEIVER_DB_URL`, `RECEIVER_DB_USERNAME`, `RECEIVER_DB_PASSWORD`, `RECEIVER_PORT`로 변경할 수 있습니다.
+`POSTGRES_PORT` 변경 시 `RECEIVER_DB_URL`도 같은 포트로 맞춥니다.
+기동 시 Flyway V1이 수신 이벤트·품질 건·naive 비교 테이블을 생성합니다.
+
+기존 볼륨에서는 init 스크립트가 다시 실행되지 않습니다. 기존 데이터를 유지하면서 receiver DB만 추가하려면
+다음 명령을 **한 번만** 실행합니다. Compose에 설정한 `RECEIVER_DB_PASSWORD`를 사용합니다.
+
+```sh
+docker compose exec postgres bash /docker-entrypoint-initdb.d/01-create-receiver-db.sh
+```
+
+장애 주입 API는 `chaos` 프로필에서만 열립니다.
+
+```sh
+./gradlew :receiver:bootRun --args='--spring.profiles.active=chaos'
+# 중복 제거 없는 비교 실험: --receiver.compare.naive-insert=true 추가
+```
+
+품질 이벤트는 `POST /api/v1/quality-events`, 장애 설정은 `POST /admin/faults`입니다.
+API·해시·트랜잭션·장애 동작은 [receiver 구현 현황](docs/plan/receiver/03-receiver-design/README.md)을 참고하세요.
 
 ## 빌드와 검증
 
@@ -81,7 +104,7 @@ receiver는 DB 없이 별도 터미널에서 실행합니다.
 # DB 없이 공통 HTTP 응답/예외 처리 검증
 .\gradlew.bat :web-support:integrationTest
 # Docker 필요: 실제 PostgreSQL 16으로 Flyway V1~V3와 health 확인
-.\gradlew.bat :gateway:integrationTest
+.\gradlew.bat :gateway:integrationTest :receiver:integrationTest
 java -jar gateway\build\libs\gateway-0.0.1-SNAPSHOT.jar
 ```
 
@@ -92,7 +115,7 @@ java -jar gateway\build\libs\gateway-0.0.1-SNAPSHOT.jar
 # DB 없이 공통 HTTP 응답/예외 처리 검증
 ./gradlew :web-support:integrationTest
 # Docker 필요: 실제 PostgreSQL 16으로 Flyway V1~V3와 health 확인
-./gradlew :gateway:integrationTest
+./gradlew :gateway:integrationTest :receiver:integrationTest
 java -jar gateway/build/libs/gateway-0.0.1-SNAPSHOT.jar
 ```
 

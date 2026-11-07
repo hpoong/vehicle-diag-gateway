@@ -53,7 +53,7 @@ Bean Validation 오류는 `errors` 목록으로 반환합니다. 잘못된 JSON,
 
 ## receiver 구성
 
-receiver는 공통 웹 기반과 Actuator를 연결한 기본 뼈대입니다. DB·Flyway와 업무 기능은 아직 추가하지 않았습니다.
+receiver는 공통 웹 기반과 Actuator에 PostgreSQL·Flyway·MyBatis를 연결하고 품질 이벤트 검증·멱등 반영을 제공합니다.
 서비스 구성 시 다음 기준을 따릅니다.
 
 1. 루트 `settings.gradle`에 `include 'receiver'`를 추가합니다.
@@ -87,4 +87,4 @@ Gradle Wrapper는 저장소 루트에 하나만 두고, 모든 서비스를 루�
 ./gradlew :web-support:integrationTest :gateway:build
 ```
 
-실제 DB 기동과 Flyway 검증은 기존 `:gateway:integrationTest`로 별도 실행합니다(Docker 필요).
+실제 DB 기동과 Flyway 검증은 `:gateway:integrationTest :receiver:integrationTest`로 별도 실행합니다(Docker 필요).
