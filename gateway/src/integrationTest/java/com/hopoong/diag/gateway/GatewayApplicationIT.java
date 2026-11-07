@@ -21,6 +21,9 @@ class GatewayApplicationIT {
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @Autowired
+    com.hopoong.diag.gateway.delivery.DeliveryProperties deliveryProperties;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     @Autowired
@@ -28,6 +31,7 @@ class GatewayApplicationIT {
 
     @Test
     void startsWithAllGatewayMigrationsAndDatabaseHealth() {
+        assertThat(deliveryProperties.enabled()).isFalse();
         assertThat(jdbc.queryForObject(
                 "select count(*) from flyway_schema_history where success = true and version is not null",
                 Integer.class)).isEqualTo(3);

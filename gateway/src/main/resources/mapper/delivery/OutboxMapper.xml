@@ -18,4 +18,57 @@
         SELECT event_id::text, status, attempt_count, last_outcome, sent_at
         FROM outbox_event WHERE result_id = #{resultId}
     </select>
+    <resultMap id="claimed" type="com.hopoong.diag.gateway.delivery.ClaimedEvent">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="event_id" javaType="java.lang.String"/>
+            <arg column="payload" javaType="java.lang.String"/>
+            <arg column="attempt_count" javaType="_int"/>
+            <arg column="cycle_no" javaType="_int"/>
+            <arg column="claim_token" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+    <select id="claim" resultMap="claimed" affectData="true" flushCache="true">
+        WITH picked AS (
+            SELECT id FROM outbox_event
+            WHERE status = 'PENDING' AND next_attempt_at &lt;= now()
+              AND (locked_until IS NULL OR locked_until &lt; now())
+            ORDER BY next_attempt_at, id LIMIT #{limit} FOR UPDATE SKIP LOCKED
+        )
+        UPDATE outbox_event o
+        SET claim_token = gen_random_uuid(), locked_by = #{instanceId},
+            locked_until = now() + #{leaseMillis} * INTERVAL '1 millisecond',
+            attempt_count = o.attempt_count + 1, updated_at = now()
+        FROM picked p WHERE o.id = p.id
+        RETURNING o.id, o.event_id::text, o.payload::text, o.attempt_count, o.cycle_no, o.claim_token::text
+    </select>
+    <sql id="currentClaim">
+        id = #{id} AND claim_token = #{claimToken}::uuid AND status = 'PENDING'
+    </sql>
+    <sql id="releaseClaim">
+        claim_token = NULL, locked_by = NULL, locked_until = NULL, updated_at = now()
+    </sql>
+    <update id="markSent">
+        UPDATE outbox_event SET status = 'SENT', sent_at = now(),
+            last_outcome = 'SUCCESS', last_http_status = #{httpStatus}, last_error = NULL,
+            <include refid="releaseClaim"/>
+        WHERE <include refid="currentClaim"/>
+    </update>
+    <update id="reschedule">
+        UPDATE outbox_event SET next_attempt_at = now() + #{delayMillis} * INTERVAL '1 millisecond',
+            last_outcome = #{outcome}, last_http_status = #{httpStatus}, last_error = #{error},
+            <include refid="releaseClaim"/>
+        WHERE <include refid="currentClaim"/>
+    </update>
+    <update id="markDead">
+        UPDATE outbox_event SET status = 'DEAD', dead_reason = #{deadReason}, dead_at = now(),
+            last_outcome = #{outcome}, last_http_status = #{httpStatus}, last_error = #{error},
+            <include refid="releaseClaim"/>
+        WHERE <include refid="currentClaim"/>
+    </update>
+    <update id="markSkippedDead">
+        UPDATE outbox_event SET status = 'DEAD', dead_reason = 'MAX_ATTEMPTS', dead_at = now(),
+            last_outcome = 'SKIPPED_MAX_ATTEMPTS', <include refid="releaseClaim"/>
+        WHERE <include refid="currentClaim"/>
+    </update>
 </mapper>

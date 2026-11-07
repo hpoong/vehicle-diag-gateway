@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hopoong.diag.gateway.delivery.DeliveryAttemptMapper">
+    <update id="abandonStarted">
+        UPDATE delivery_attempt SET outcome = 'ABANDONED', finished_at = now()
+        WHERE outcome = 'STARTED' AND outbox_id IN
+        <foreach collection="outboxIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+    <insert id="insertStarted">
+        INSERT INTO delivery_attempt (outbox_id, cycle_no, attempt_no, claim_token, worker_id, started_at, outcome)
+        VALUES (#{outboxId}, #{cycleNo}, #{attemptNo}, #{claimToken}::uuid, #{workerId}, now(), 'STARTED')
+    </insert>
+    <update id="finish">
+        UPDATE delivery_attempt SET outcome = #{outcome}, finished_at = now(), http_status = #{httpStatus},
+            error_code = #{errorCode}, error_message = #{errorMessage}, latency_ms = #{latencyMs}
+        WHERE claim_token = #{claimToken}::uuid AND outcome = 'STARTED'
+    </update>
+    <insert id="insertSkipped">
+        INSERT INTO delivery_attempt (outbox_id, cycle_no, attempt_no, claim_token, worker_id, started_at, finished_at, outcome)
+        VALUES (#{outboxId}, #{cycleNo}, #{attemptNo}, #{claimToken}::uuid, #{workerId}, now(), now(), 'SKIPPED_MAX_ATTEMPTS')
+    </insert>
+    <update id="recordLateOutcome">
+        UPDATE delivery_attempt SET late_outcome = #{lateOutcome}
+        WHERE claim_token = #{claimToken}::uuid AND outcome = 'ABANDONED' AND late_outcome IS NULL
+    </update>
+</mapper>

@@ -27,10 +27,6 @@ diag:
   web:
     problem-type-prefix: 'urn:diag-gateway:error:'
 
-logging:
-  pattern:
-    level: '%5p [requestId:%X{requestId:-} deviceId:%X{deviceId:-} eventId:%X{eventId:-} resultId:%X{resultId:-}]'
-
 server:
   port: ${GATEWAY_PORT:8080}
   shutdown: graceful
@@ -53,3 +49,7 @@ management:
       probes:
         enabled: true
       show-details: never
+
+gateway:
+  delivery:
+    instance-id: ${GATEWAY_INSTANCE_ID:}

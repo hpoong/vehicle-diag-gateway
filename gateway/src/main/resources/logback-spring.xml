@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="LOG_LEVEL_PATTERN"
+              value="%5p [requestId:%X{requestId:-} deviceId:%X{deviceId:-} eventId:%X{eventId:-} resultId:%X{resultId:-} outboxId:%X{outboxId:-} claimToken:%X{claimToken:-} attemptNo:%X{attemptNo:-}]"/>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
