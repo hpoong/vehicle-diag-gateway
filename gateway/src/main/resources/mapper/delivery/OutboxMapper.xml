@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hopoong.diag.gateway.delivery.OutboxMapper">
+    <insert id="insert">
+        INSERT INTO outbox_event (event_id, result_id, payload)
+        VALUES (#{eventId}::uuid, #{resultId}, #{payload}::jsonb)
+    </insert>
+    <resultMap id="delivery" type="com.hopoong.diag.gateway.delivery.OutboxMapper$DeliveryRow">
+        <constructor>
+            <arg column="event_id" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="attempt_count" javaType="_int"/>
+            <arg column="last_outcome" javaType="java.lang.String"/>
+            <arg column="sent_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+    <select id="findByResultId" resultMap="delivery">
+        SELECT event_id::text, status, attempt_count, last_outcome, sent_at
+        FROM outbox_event WHERE result_id = #{resultId}
+    </select>
+</mapper>

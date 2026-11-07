@@ -7,7 +7,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
+import com.hopoong.diag.gateway.common.UtcTime;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DiagnosticResultNormalizer {
-    private static final DateTimeFormatter HASH_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
     private static final ObjectMapper HASH_MAPPER = new ObjectMapper();
     private final ObjectMapper objectMapper;
 
@@ -43,7 +42,7 @@ public class DiagnosticResultNormalizer {
         canonical.put("deviceId", command.deviceId());
         canonical.put("ecus", ecus.stream().map(DiagnosticResultNormalizer::canonicalEcu).toList());
         canonical.put("eventId", command.eventId());
-        canonical.put("occurredAt", HASH_TIME.format(command.occurredAt()));
+        canonical.put("occurredAt", UtcTime.MILLIS.format(command.occurredAt().toInstant()));
         canonical.put("sessionId", command.sessionId());
         canonical.put("vin", command.vin());
         try {

@@ -18,4 +18,59 @@
           LEFT JOIN outbox_event o ON o.result_id = r.id
          WHERE r.device_id = #{deviceId} AND r.event_id = #{eventId}
     </select>
+
+    <resultMap id="inserted" type="com.hopoong.diag.gateway.ingest.InsertedResult">
+        <constructor><idArg column="id" javaType="_long"/><arg column="received_at" javaType="java.time.OffsetDateTime"/></constructor>
+    </resultMap>
+    <select id="insertResult" resultMap="inserted" affectData="true" flushCache="true">
+        INSERT INTO diagnostic_result (device_id, event_id, payload_hash, brand, vin, session_id,
+            occurred_at, policy_code, raw_payload)
+        VALUES (#{cmd.deviceId}, #{cmd.eventId}, #{payloadHash}, #{cmd.brand}, #{cmd.vin}, #{cmd.sessionId},
+            #{cmd.occurredAt}, #{policyCode}, #{rawPayload}::jsonb)
+        ON CONFLICT (device_id, event_id) DO NOTHING RETURNING id, received_at
+    </select>
+    <insert id="insertObservations">
+        INSERT INTO ecu_observation (result_id, ecu_id, sw_version, dtc_codes) VALUES
+        <foreach collection="rows" item="r" separator=",">
+            (#{r.resultId}, #{r.ecuId}, #{r.swVersion}, #{r.dtcCodes,typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[])
+        </foreach>
+    </insert>
+    <insert id="upsertLatest">
+        INSERT INTO vehicle_ecu_latest (vin, ecu_id, result_id, occurred_at, dtc_codes, updated_at)
+        VALUES (#{vin}, #{ecuId}, #{resultId}, #{occurredAt},
+            #{dtcCodes,typeHandler=org.apache.ibatis.type.ArrayTypeHandler}::text[], now())
+        ON CONFLICT (vin, ecu_id) DO UPDATE SET result_id = EXCLUDED.result_id,
+            occurred_at = EXCLUDED.occurred_at, dtc_codes = EXCLUDED.dtc_codes, updated_at = now()
+        WHERE (vehicle_ecu_latest.occurred_at, vehicle_ecu_latest.result_id)
+            &lt; (EXCLUDED.occurred_at, EXCLUDED.result_id)
+    </insert>
+    <resultMap id="result" type="com.hopoong.diag.gateway.ingest.DiagnosticResultMapper$ResultRow">
+        <constructor>
+            <idArg column="id" javaType="_long"/>
+            <arg column="device_id" javaType="java.lang.String"/>
+            <arg column="event_id" javaType="java.lang.String"/>
+            <arg column="brand" javaType="java.lang.String"/>
+            <arg column="vin" javaType="java.lang.String"/>
+            <arg column="session_id" javaType="java.lang.String"/>
+            <arg column="occurred_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="received_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="policy_code" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+    <select id="findById" resultMap="result">
+        SELECT id, device_id, event_id, brand, vin, session_id, occurred_at, received_at, policy_code
+        FROM diagnostic_result WHERE id = #{id}
+    </select>
+    <resultMap id="observation" type="com.hopoong.diag.gateway.ingest.ObservationRow">
+        <constructor>
+            <arg column="result_id" javaType="_long"/>
+            <arg column="ecu_id" javaType="java.lang.String"/>
+            <arg column="sw_version" javaType="java.lang.String"/>
+            <arg column="dtc_codes" javaType="[Ljava.lang.String;" typeHandler="org.apache.ibatis.type.ArrayTypeHandler"/>
+        </constructor>
+    </resultMap>
+    <select id="findObservations" resultMap="observation">
+        SELECT result_id, ecu_id, sw_version, dtc_codes FROM ecu_observation
+        WHERE result_id = #{resultId} ORDER BY ecu_id
+    </select>
 </mapper>
