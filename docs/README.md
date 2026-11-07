@@ -50,6 +50,7 @@ docs/
 - [구현 상세와 검증 요약](architecture/implementation-notes.md)
 - [개발 환경 및 실행 가이드](getting-started.md): 기존 README의 기술 구성·설정·실행·검증 안내
 - [README 도식 원본 HTML](assets/readme/diagrams.html): 구조·상태·응답 유실·복구·검증 비교 이미지
+- 실제 프로세스 재현 도구: [가상 단말 simulator](../simulator/README.md) · [장애 주입·대조 scripts](../scripts/README.md) · [로컬 콘솔 front](../front/README.md)
 
 ### 1. 시스템 아키텍처 ([`architecture/`](architecture/))
 - [**시스템 아키텍처 개요 (`architecture/overview.md`)**](architecture/overview.md)  

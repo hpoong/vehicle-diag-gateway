@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diag Gateway Lab</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1l7 7-7 7-7-7z' fill='%232a78d6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">◆</span>
+    <div>
+      <h1>Diag Gateway Lab</h1>
+      <p class="sub">가상 단말 · 장애 주입 · 정합성 대조</p>
+    </div>
+  </div>
+  <div class="pills" id="pills"></div>
+  <div class="jobchip" id="jobchip" hidden></div>
+</header>
+
+<main class="layout">
+  <aside class="side">
+    <section class="card">
+      <div class="card-h"><h2>서비스</h2>
+        <button class="btn ghost sm" data-svc="build" title="./gradlew :gateway:bootJar :receiver:bootJar">bootJar 빌드</button>
+      </div>
+      <div id="services" class="svc-list"></div>
+      <p class="hint">gateway는 데모용 짧은 설정으로 실행합니다: 백오프 1~4s, 최대 6회, lease 10s.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>장애 주입 <span class="muted">receiver</span></h2><span id="faultNow" class="tag">-</span></div>
+      <div class="seg" id="faultSeg" role="radiogroup" aria-label="장애 모드">
+        <button data-mode="NONE" role="radio">NONE</button>
+        <button data-mode="DOWN" role="radio">DOWN</button>
+        <button data-mode="DROP_AFTER_COMMIT" role="radio">DROP_AFTER_COMMIT</button>
+      </div>
+      <label class="field inline">holdMs
+        <input id="holdMs" type="number" min="0" max="60000" step="500" value="6000">
+      </label>
+      <p class="hint">DOWN: 503 응답 · DROP_AFTER_COMMIT: 커밋 후 holdMs만큼 응답 지연 (gateway readTimeout 5s)</p>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>시뮬레이터 <span class="muted">가상 단말</span></h2></div>
+      <form id="simForm" class="sim">
+        <label class="field">고유 결과 수<input name="count" type="number" min="1" max="20000" value="100"></label>
+        <label class="field">동시 전송<input name="concurrency" type="number" min="1" max="64" value="8"></label>
+        <label class="field range">재전송 (200)<input name="duplicateRate" type="range" min="0" max="1" step="0.05" value="0.2"><output></output></label>
+        <label class="field range">같은 키·다른 내용 (409)<input name="conflictRate" type="range" min="0" max="1" step="0.05" value="0"><output></output></label>
+        <label class="field range">늦게 도착한 과거 결과<input name="lateRate" type="range" min="0" max="1" step="0.05" value="0.1"><output></output></label>
+        <label class="field range">BRAND_A 정책 위반 (422)<input name="invalidRate" type="range" min="0" max="1" step="0.05" value="0"><output></output></label>
+        <label class="field">초당 전송 제한<input name="rate" type="number" min="0" step="1" value="0" placeholder="0 = 무제한"></label>
+        <label class="field">seed<input name="seed" type="number" placeholder="무작위"></label>
+        <button class="btn primary wide" type="submit">전송</button>
+      </form>
+      <pre class="preview" id="simPreview" hidden></pre>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>데이터</h2></div>
+      <div class="row">
+        <button class="btn" id="btnReconcile">대조 실행</button>
+        <button class="btn danger" id="btnReset">DB 초기화</button>
+      </div>
+      <p class="hint">초기화는 로컬 gateway·receiver DB의 업무 데이터를 모두 지웁니다 (스키마 유지).</p>
+    </section>
+  </aside>
+
+  <section class="main">
+    <section class="card">
+      <div class="card-h"><h2>실시간 연계 현황</h2><span class="muted" id="countsAt">-</span></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="charts">
+        <figure class="chart" id="timeline">
+          <figcaption>outbox 상태와 receiver 반영 건수 <span class="muted">최근 2분</span></figcaption>
+          <div class="legend" id="tlLegend"></div>
+          <div class="plot" id="tlPlot"></div>
+        </figure>
+        <figure class="chart">
+          <figcaption>전송 시도 결과 <span class="muted">delivery_attempt.outcome</span></figcaption>
+          <div id="attemptBars" class="hbars"></div>
+        </figure>
+      </div>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="scenarios" aria-selected="true">시나리오</button>
+      <button role="tab" data-tab="ops">운영 콘솔</button>
+      <button role="tab" data-tab="recon">대조 결과</button>
+      <button role="tab" data-tab="logs">서비스 로그</button>
+      <button role="tab" data-tab="history">실행 기록</button>
+    </nav>
+
+    <section class="tab" id="tab-scenarios">
+      <div class="card">
+        <div class="card-h"><h2>장애 시나리오</h2>
+          <div class="row">
+            <button class="btn" id="btnRunAll">전체 실행</button>
+            <button class="btn ghost" id="btnStop" disabled>중단</button>
+          </div>
+        </div>
+        <div class="scen-grid" id="scenarios"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>실행 로그 <span class="muted" id="jobTitle"></span></h2><span id="jobState" class="tag">대기</span></div>
+        <div class="progress" id="jobProgress" hidden><div></div></div>
+        <pre class="console" id="console" aria-live="polite"></pre>
+        <div id="jobResult"></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-ops" hidden>
+      <div class="card">
+        <div class="card-h"><h2>운영 요약 <span class="muted">GET /ops/summary</span></h2>
+          <div class="row">
+            <select id="opsGateway" aria-label="gateway 선택">
+              <option value="http://localhost:8080">gw-1 :8080</option>
+              <option value="http://localhost:8082">gw-2 :8082</option>
+            </select>
+            <button class="btn ghost sm" id="btnOpsRefresh">새로고침</button>
+          </div>
+        </div>
+        <div id="opsSummary" class="kv"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>이벤트 목록</h2>
+          <div class="seg small" id="opsStatus">
+            <button data-st="DEAD" aria-pressed="true">DEAD</button>
+            <button data-st="PENDING">PENDING</button>
+            <button data-st="SENT">SENT</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table class="grid" id="opsEvents"></table></div>
+      </div>
+      <div class="card" id="attemptCard" hidden>
+        <div class="card-h"><h2>시도 이력 <span class="muted" id="attemptTitle"></span></h2></div>
+        <div class="table-wrap"><table class="grid" id="opsAttempts"></table></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-recon" hidden>
+      <div class="card">
+        <div class="card-h"><h2>DB 대조 <span class="muted">scripts/reconcile.py</span></h2>
+          <div class="row">
+            <label class="check"><input type="checkbox" id="reconNaive"> naive 모드</label>
+            <button class="btn" id="btnReconcile2">대조 실행</button>
+          </div>
+        </div>
+        <div id="recon"><p class="empty">대조를 실행하면 I1~I6 판정이 표시됩니다.</p></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-logs" hidden>
+      <div class="card">
+        <div class="card-h"><h2>프로세스 로그 <span class="muted">build/run/*.log</span></h2>
+          <div class="seg small" id="logSel">
+            <button data-log="gateway" aria-pressed="true">gateway</button>
+            <button data-log="gateway2">gateway2</button>
+            <button data-log="receiver">receiver</button>
+          </div>
+        </div>
+        <pre class="console tall" id="svcLog"></pre>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-history" hidden>
+      <div class="card">
+        <div class="card-h"><h2>실행 기록 <span class="muted">이 서버가 켜진 뒤</span></h2></div>
+        <div class="table-wrap"><table class="grid" id="history"></table></div>
+      </div>
+    </section>
+  </section>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

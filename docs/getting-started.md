@@ -95,6 +95,26 @@ docker compose exec postgres bash /docker-entrypoint-initdb.d/01-create-receiver
 품질 이벤트는 `POST /api/v1/quality-events`, 장애 설정은 `POST /admin/faults`입니다.
 API·해시·트랜잭션·장애 동작은 [receiver 구현 현황](plan/receiver/03-receiver-design/README.md)을 참고하세요.
 
+## 시뮬레이터·장애 콘솔 (선택)
+
+실제 gateway·receiver 프로세스에 가상 단말 데이터를 보내고, 프로세스 강제 종료 같은 장애를 만든 뒤 두 DB를 대조합니다.
+Python 3.9 이상이 필요합니다. DB 대조와 초기화에는 psycopg를 사용합니다.
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
+.venv/bin/python -m scripts.services up        # PostgreSQL
+.venv/bin/python -m scripts.services build     # bootJar
+.venv/bin/python front/server.py               # 브라우저 콘솔 http://127.0.0.1:8070
+# 또는 CLI
+.venv/bin/python -m scripts.services start
+.venv/bin/python -m simulator --count 100 --duplicate-rate 0.2
+.venv/bin/python -m scripts.reconcile
+.venv/bin/python -m scripts.scenarios run all
+```
+
+`bootRun`으로 띄운 서비스와 포트가 겹치면 스크립트로 시작할 수 없습니다. 먼저 `bootRun`을 종료합니다.
+명령과 시나리오는 [simulator](../simulator/README.md), [scripts](../scripts/README.md), [front](../front/README.md)를 참고하세요.
+
 ## 빌드와 검증
 
 저장소 루트에서 실행합니다.

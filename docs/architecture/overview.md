@@ -58,7 +58,7 @@ flowchart LR
 
 ### 2.2. 시나리오 테스트 (JUnit 5 + Testcontainers)
 
-가상 단말·장애 주입·정합성 대조를 모두 gateway의 `integrationTest`에서 처리합니다. 별도 Python 도구나 셸 스크립트는 두지 않습니다.
+가상 단말·장애 주입·정합성 대조의 기준 검증은 gateway의 `integrationTest`에서 처리합니다. 같은 시나리오를 실제 프로세스로 재현하는 Python 도구(`simulator/`, `scripts/`)와 로컬 콘솔(`front/`)은 [2.3절](#23-실제-프로세스-재현-도구)에 정리했습니다.
 
 | 역할 | 구현 | 설명 |
 |---|---|---|
@@ -70,14 +70,26 @@ flowchart LR
 
 검증하는 시나리오: S1 재전송, S2 충돌, S3 지연 도착, S4 수신 서버 중단, S5 응답 유실, S7 처리 중 종료, S8 동시 선점, S9 lease 초과(stale claim), S10 최대 시도 초과 후 수동 재처리, S12 중복 검사 없는 비교 실험.
 
+### 2.3. 실제 프로세스 재현 도구
+
+통합 테스트는 처리 중 종료와 동시 선점을 한 JVM 안에서 흉내 냅니다. 실제 프로세스에서 같은 결과가 나오는지 확인하려고 아래 도구를 추가했습니다. 테스트를 대체하지 않으며, 판정 규칙(I1~I6)은 `ReconcileAssertions`와 같습니다.
+
+| 디렉토리 | 역할 |
+|---|---|
+| `simulator/` | 가상 진단 단말. 재전송(200)·충돌(409)·지연 도착·정책 위반(422)을 섞어 실행 중인 gateway에 HTTP로 전송 |
+| `scripts/` | bootJar 프로세스 제어(`SIGKILL`·`SIGSTOP`, gateway 2개), receiver 장애 주입, 두 DB 대조(psycopg), 시나리오 실행기 |
+| `front/` | 위 두 도구를 브라우저에서 다루는 로컬 콘솔(Python 표준 라이브러리 서버 + 정적 HTML) |
+
+S7은 응답을 기다리는 gateway를 실제로 `SIGKILL` 하고, S8은 gateway 프로세스 2개를 띄우며, S9는 gw-1을 `SIGSTOP`한 뒤 gw-2가 이어받게 합니다.
+
 ---
 
-### 2.3. 데이터베이스 및 인프라
+### 2.4. 데이터베이스 및 인프라
 
 | 구성 요소 | 기술 | 세부 설명 |
 |---|---|---|
 | **PostgreSQL 16** | Docker Compose(로컬 실행) / Testcontainers(테스트) | 인스턴스 하나에 `gateway`와 `receiver` 두 논리 데이터베이스를 분리합니다. H2 등 임베디드 DB를 쓰지 않고 실제 PostgreSQL의 `FOR UPDATE SKIP LOCKED`, `ON CONFLICT`, `jsonb`, 부분 인덱스를 그대로 검증합니다. |
-| **docker-compose.yml** | Docker Compose | 로컬 개발용 PostgreSQL을 띄웁니다. 애플리케이션은 `bootRun`으로 실행합니다. |
+| **docker-compose.yml** | Docker Compose | 로컬 개발용 PostgreSQL을 띄웁니다. 애플리케이션은 `bootRun` 또는 `scripts/services.py`(bootJar)로 실행합니다. |
 
 ---
 
@@ -95,6 +107,9 @@ vehicle-diag-gateway/
 ├─ receiver/                 # [Spring Boot #2] 가상 품질 시스템 (장애 주입 포함)
 │  ├─ src/
 │  └─ build.gradle
+├─ simulator/                # 가상 진단 단말 (Python)
+├─ scripts/                  # 프로세스 제어·장애 주입·DB 대조·시나리오 실행 (Python)
+├─ front/                    # simulator·scripts 로컬 웹 콘솔
 ├─ docs/
 │  ├─ README.md              # 문서 전체 허브
 │  ├─ architecture/          # 시스템 아키텍처 및 모듈 명세
@@ -115,7 +130,7 @@ vehicle-diag-gateway/
    게이트웨이의 핵심 가치는 "외부 시스템 전송 중 장애(중단, 응답 유실, 처리 중 종료)가 나도 결과가 유실되거나 중복 반영되지 않는다"를 증명하는 것입니다. 이를 검증하려면 **장애를 내고, 커밋한 뒤 응답을 끊는 가상 수신 서버(`receiver`)**와, 그 서버 쪽의 고유 제약이 실제로 중복을 막는지 확인할 별도 DB가 필요합니다.
 
 2. **검증을 JUnit 한 가지로 모은 이유**:
-   개발 기간이 5일이므로 Python simulator·reconcile 스크립트·docker 장애 스크립트를 따로 만들지 않았습니다. 같은 입력과 판정을 테스트 코드로 만들면 `.\gradlew.bat integrationTest`(macOS는 `./gradlew integrationTest`) 한 번으로 모든 시나리오를 재현할 수 있고, 결과 수치도 테스트 실행 결과에서 바로 얻습니다.
+   같은 입력과 판정을 테스트 코드로 만들면 `.\gradlew.bat integrationTest`(macOS는 `./gradlew integrationTest`) 한 번으로 모든 시나리오를 재현할 수 있고, 결과 수치도 테스트 실행 결과에서 바로 얻습니다. CI 기준은 이 테스트입니다. `simulator/`·`scripts/`는 그 위에 실제 프로세스 종료·다중 인스턴스를 확인하는 보조 도구입니다.
 
 3. **5일 범위에서 뺀 것**:
-   Python 도구, 다중 gateway 컨테이너와 `docker kill` 시나리오, receiver의 `SLOW`·`ERROR_RATE` 모드, 지표·경보, 운영 API 인증. 각 항목을 뺀 이유는 설계 문서마다 마지막 절("v1.0에서 뺀 것")에 있습니다.
+   gateway 컨테이너화(실제 프로세스 시나리오는 로컬 bootJar 프로세스로 대신), receiver의 `SLOW`·`ERROR_RATE` 모드, 지표·경보, 운영 API 인증. 각 항목을 뺀 이유는 설계 문서마다 마지막 절("v1.0에서 뺀 것")에 있습니다.

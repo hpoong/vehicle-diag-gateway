@@ -49,3 +49,7 @@ CONTEXT.md
 
 temp/
 agent/
+### Python ###
+.venv/
+__pycache__/
+*.pyc

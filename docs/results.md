@@ -76,6 +76,31 @@ SCENARIO_RESULT scenario=S12 mode=NAIVE results=20 outbox=20 pending=0 sent=20 d
 
 정의한 장애 시나리오에서 누락·중복 반영 0건을 확인했다. 이 결론은 기본 모드에서 실행한 시나리오 범위에 한하며 모든 환경에서의 보장을 뜻하지 않는다. S12는 중복 발생을 확인하기 위한 대조군이다.
 
+## 실제 프로세스 재현 (scripts/scenarios.py)
+
+통합 테스트와 같은 판정(I1~I6)을 실제 bootJar 프로세스, 실제 HTTP, Compose PostgreSQL로 다시 확인했다.
+S7은 응답을 기다리는 gateway를 `SIGKILL`로 종료한 뒤 다시 띄웠다. S8은 gateway 프로세스 2개를 실행했다.
+S9는 gw-1을 `SIGSTOP`으로 멈추고 gw-2가 이어받게 한 뒤 `SIGCONT`로 재개했다.
+E1은 시뮬레이터가 기대한 저장 건수와 실제 결과 수가 같은지 판정한다.
+
+- 실행일: 2026-11-07 (Asia/Seoul), macOS aarch64, OpenJDK 17.0.2, Python 3.9.6, Colima Docker `postgres:16-alpine`.
+- 명령: `.venv/bin/python -m scripts.scenarios run all`
+- gateway 전송 설정(데모용): 백오프 1~4s, 최대 6회, lease 10s, readTimeout 5s(기본값).
+- 결과: 10개 시나리오 모두 PASS. S8은 gw-1 100건, gw-2 100건을 성공 처리했고, S9의 늦은 결과 4건은 `late_outcome=SUCCESS`로만 기록됐다.
+
+```text
+SCENARIO_RESULT scenario=S1 mode=STANDARD results=40 outbox=40 pending=0 sent=40 dead=0 received=40 dup1=0 attempts={SUCCESS=40} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S2 mode=STANDARD results=30 outbox=30 pending=0 sent=30 dead=0 received=30 dup1=0 attempts={SUCCESS=30} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S3 mode=STANDARD results=39 outbox=39 pending=0 sent=39 dead=0 received=39 dup1=0 attempts={SUCCESS=39} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S4 mode=STANDARD results=20 outbox=20 pending=0 sent=20 dead=0 received=20 dup1=0 attempts={RETRYABLE=44, SUCCESS=20} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S5 mode=STANDARD results=20 outbox=20 pending=0 sent=20 dead=0 received=20 dup1=0 attempts={SUCCESS=20, UNCERTAIN=4} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S7 mode=STANDARD results=12 outbox=12 pending=0 sent=12 dead=0 received=12 dup1=0 attempts={ABANDONED=4, SUCCESS=12} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S8 mode=STANDARD results=200 outbox=200 pending=0 sent=200 dead=0 received=200 dup1=0 attempts={SUCCESS=200} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S9 mode=STANDARD results=8 outbox=8 pending=0 sent=8 dead=0 received=8 dup1=0 attempts={ABANDONED=4, SUCCESS=8} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S10 mode=STANDARD results=5 outbox=5 pending=0 sent=5 dead=0 received=5 dup1=0 attempts={RETRYABLE=30, SUCCESS=5} E1=PASS I1=PASS I2=PASS I3=PASS I4=PASS I5=PASS I6=PASS
+SCENARIO_RESULT scenario=S12 mode=NAIVE results=20 outbox=20 pending=0 sent=20 dead=0 received=0 dup1=11 attempts={SUCCESS=20, UNCERTAIN=4} E1=PASS I1=PASS I2=PASS I3=SKIP I4=SKIP I5=SKIP I6=PASS
+```
+
 ## 제외한 시나리오
 
 - S6 (`SLOW`): S5와 같은 응답 불확실성·재전송 성질을 검사하므로 중복 범위에서 제외했다.
