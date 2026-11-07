@@ -1,6 +1,6 @@
 # Vehicle Diagnostic Gateway
 
-차량 진단 결과 연계 gateway의 Java 17 초기 프로젝트입니다.
+차량 진단 결과 연계 gateway의 Java 17 프로젝트입니다.
 [문서 가이드](docs/README.md), [아키텍처](docs/architecture/overview.md), [DB 설계](docs/db/README.md), [개발 컨벤션](docs/convention/conventions.md)을 기준으로 구성했습니다.
 
 ## 기술 및 구조
@@ -12,8 +12,10 @@
 - `ingest`, `policy`, `delivery`, `ops`, `common`: 설계 책임별 패키지
 - `gateway/src/main/resources/db/migration/`: 수신·outbox·운영 감사 테이블
 
-현재는 프로젝트 골격, 설정, 스키마와 기동 검증까지 구성되어 있습니다. 진단 수신 API, 정책,
-outbox 워커, 운영 API는 후속 구현 대상입니다. 공통 HTTP 응답·예외 처리는 구성되어 있습니다.
+진단 결과 수신·정규화·중복 판정·공통/브랜드 검증·원자적 저장·최신 상태 갱신·outbox 예약·결과 조회를 구현했습니다.
+[수신 기능 구현 현황](docs/plan/gateway/README.md)에서 단계별 동작과 검증 기록을 확인할 수 있습니다.
+[일반 설명용](docs/flow/gateway-overview.html)과 [개발자용](docs/flow/gateway-developer.html) 슬라이드 HTML을 제공합니다.
+outbox 전송 워커와 운영 API는 후속 구현 대상입니다.
 `receiver/`와 시나리오 테스트(JUnit + Testcontainers, 정합성 대조 포함)는 후속 단계에서 구성합니다.
 
 ## 로컬 실행
@@ -78,7 +80,7 @@ java -jar gateway\build\libs\gateway-0.0.1-SNAPSHOT.jar
 java -jar gateway/build/libs/gateway-0.0.1-SNAPSHOT.jar
 ```
 
-단위 테스트는 `test`, DB 기동 검증은 별도 `integrationTest` 태스크입니다.
+단위 테스트는 `test`, PostgreSQL 기반 수신·조회 및 기동 검증은 별도 `integrationTest` 태스크입니다.
 CI에서는 `build integrationTest`를 함께 실행합니다. H2는 사용하지 않습니다.
 공통 응답 사용법과 receiver 연결 방법은 [공통 웹 기반](docs/architecture/web-support.md)을 참고하세요.
 

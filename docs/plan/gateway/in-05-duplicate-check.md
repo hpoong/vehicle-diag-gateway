@@ -48,8 +48,8 @@ SELECT r.id, r.payload_hash, r.policy_code, r.received_at,
 
 ### 3.2. 판정 (`IngestService`)
 - 흐름: `normalize`(IN-04) → `findByKey` → 있으면 `judgeExisting(existing, command, hash)`
-- **`IngestResult`** record: `outcome(ACCEPTED | DUPLICATE), resultId, deviceId, eventId, policyCode, receivedAt, deliveryEventId, deliveryStatus`. `ACCEPTED`는 IN-08에서 채웁니다.
-- 현재 `DUPLICATE`는 서비스 반환값까지만 만들어지고, HTTP 200 응답 본문 변환은 IN-11에서 합니다.
+- **`IngestResult`** record: `outcome(ACCEPTED | DUPLICATE), resultId, deviceId, eventId, policyCode, receivedAt, deliveryEventId, deliveryStatus`. `ACCEPTED`는 IN-08 저장 완료 후 반환합니다.
+- `DUPLICATE`는 IN-11에서 HTTP 200과 `data` 응답 본문으로 변환합니다.
 
 ---
 
@@ -73,3 +73,7 @@ SELECT r.id, r.payload_hash, r.policy_code, r.received_at,
 ```sh
 ./gradlew :gateway:integrationTest   # Windows: .\gradlew.bat :gateway:integrationTest (Docker 필요)
 ```
+
+## 후속 구현 반영 (2026-11-07)
+
+현재 수신 흐름은 형식 검증 → 정규화 → 중복 판정 → 공통 규칙 → 브랜드 정책 → 단일 트랜잭션 저장입니다. 신규 202 / 중복 200을 반환하며, 결과 ID로 조회할 수 있습니다. 성공 응답은 `data`로 래핑합니다. 상세 상태와 검증 기록은 [구현 현황](README.md)을 참조합니다.

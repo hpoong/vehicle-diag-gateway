@@ -50,7 +50,7 @@
 ### 3.3. 컨트롤러·서비스
 - **`DiagnosticResultController`**: `@Valid @RequestBody`로 바인딩한 뒤 `IngestService.ingest(request)`에 위임합니다.
 - 알 수 없는 필드는 `application.yml`의 `fail-on-unknown-properties: true`로 거부됩니다(기존 설정).
-- 성공 응답 본문(`200`/`202`)은 IN-11에서 완성합니다. 현재 컨트롤러는 반환값이 없습니다.
+- 성공 응답은 IN-11 구현을 반영해 신규 `202` / 중복 `200`과 `ApiResponse<IngestResponse>` 본문을 반환합니다.
 
 ---
 
@@ -76,3 +76,7 @@
 ```sh
 ./gradlew :gateway:test :gateway:integrationTest   # Windows: .\gradlew.bat ...
 ```
+
+## 후속 구현 반영 (2026-11-07)
+
+현재 수신 흐름은 형식 검증 → 정규화 → 중복 판정 → 공통 규칙 → 브랜드 정책 → 단일 트랜잭션 저장입니다. 신규 202 / 중복 200을 반환하며, 결과 ID로 조회할 수 있습니다. 성공 응답은 `data`로 래핑합니다. 상세 상태와 검증 기록은 [구현 현황](README.md)을 참조합니다.

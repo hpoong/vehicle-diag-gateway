@@ -12,7 +12,7 @@
 브랜드마다 다른 검증 규칙을 버전이 붙은 정책(`STANDARD-v1`, `BRAND_A-v1`)으로 분리하고, 요청의 `brand`로 적용할 정책을 고릅니다. 등록되지 않은 브랜드에는 `STANDARD-v1`을 적용합니다.
 정책을 위반하면 `422 policy-violation`에 어떤 정책으로 판정했는지(`policyCode`)를 함께 응답합니다. 통과하면 적용한 정책 코드를 저장 단계(IN-08)로 넘겨 `diagnostic_result.policy_code`에 남깁니다.
 
-구현 순서는 IN-06보다 먼저지만, 서비스 안의 실행 위치는 **중복 판정 → 공통 규칙(IN-06) → 브랜드 정책** 순입니다.
+서비스 안의 실행 위치는 **중복 판정 → 공통 규칙(IN-06) → 브랜드 정책** 순입니다.
 
 ---
 
@@ -43,7 +43,7 @@
 - `resolve(brand)`: 매핑이 없으면 `STANDARD-v1`을 반환합니다.
 
 ### 3.3. `IngestService` 연동
-- 중복 판정(IN-05)에서 기존 결과가 없을 때 `registry.resolve(brand).validate(command)`를 실행합니다.
+- 중복 판정(IN-05)에서 기존 결과가 없고 공통 규칙(IN-06)을 통과하면 `registry.resolve(brand).validate(command)`를 실행합니다.
 - 위반이 있으면 `BusinessException(POLICY_VIOLATION, errors, Map.of("policyCode", code))`를 던집니다. IN-02의 확장 속성 덕분에 응답 최상위에 `policyCode`가 나옵니다.
 
 ---
@@ -74,7 +74,7 @@
 
 ---
 
-## 6. 현재 한계
 
-- 공통 규칙(IN-06)이 아직 없어, 지금은 중복 판정 바로 다음에 정책 검증이 실행됩니다. IN-06 구현 시 그 사이에 공통 규칙을 넣습니다.
-- 저장 단계(IN-08)가 없어, 정책을 통과한 정상 요청은 아직 `UnsupportedOperationException`(500)으로 끝납니다.
+## 후속 구현 반영 (2026-11-07)
+
+현재 수신 흐름은 형식 검증 → 정규화 → 중복 판정 → 공통 규칙 → 브랜드 정책 → 단일 트랜잭션 저장입니다. 신규 202 / 중복 200을 반환하며, 결과 ID로 조회할 수 있습니다. 성공 응답은 `data`로 래핑합니다. 상세 상태와 검증 기록은 [구현 현황](README.md)을 참조합니다.

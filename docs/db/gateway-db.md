@@ -40,7 +40,7 @@ erDiagram
 
 ### 2.3. `vehicle_ecu_latest` (차량-ECU별 최신 관측 상태)
 - 차량(VIN)과 ECU 단위의 가장 최신 진단 상태를 유지합니다.
-- **설계 포인트**: 네트워크 지연으로 인해 **과거 결과가 늦게 도착해도 최신 상태를 덮어쓰지 않도록** `occurred_at`이 기존 값보다 늦을 때만 조건부 UPSERT합니다.
+- **설계 포인트**: 네트워크 지연으로 인해 **과거 결과가 늦게 도착해도 최신 상태를 덮어쓰지 않도록** `(occurred_at, result_id)`가 기존 튜플보다 클 때만 조건부 UPSERT합니다.
 
 ### 2.4. `outbox_event` (전송 예약 및 선점 큐)
 - 수신 트랜잭션과 원자적으로 묶여 생성되는 전송 큐 테이블입니다.
@@ -69,7 +69,8 @@ ON CONFLICT (vin, ecu_id) DO UPDATE
        occurred_at = EXCLUDED.occurred_at,
        dtc_codes = EXCLUDED.dtc_codes,
        updated_at = now()
- WHERE vehicle_ecu_latest.occurred_at < EXCLUDED.occurred_at; -- 과거 데이터가 덮어쓰지 않음
+ WHERE (vehicle_ecu_latest.occurred_at, vehicle_ecu_latest.result_id)
+     < (EXCLUDED.occurred_at, EXCLUDED.result_id); -- 같은 시각이면 더 큰 결과 ID 우선
 ```
 
 ### 3.2. Outbox 선점 쿼리 (SKIP LOCKED)
