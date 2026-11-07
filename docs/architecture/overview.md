@@ -86,6 +86,7 @@ flowchart LR
 ```text
 vehicle-diag-gateway/
 ├─ settings.gradle           # 루트 Gradle 멀티 프로젝트 (web-support, gateway; receiver 추가 예정)
+├─ gradlew, gradlew.bat      # Gradle Wrapper 8.14.3 (루트에 하나만 둡니다)
 ├─ web-support/              # 두 서비스가 공유하는 HTTP 응답·예외 처리·요청 추적 라이브러리
 ├─ gateway/                  # [Spring Boot #1] 진단 연계 게이트웨이
 │  ├─ src/main/              # ingest, policy, delivery, ops, common 패키지
@@ -114,7 +115,7 @@ vehicle-diag-gateway/
    게이트웨이의 핵심 가치는 "외부 시스템 전송 중 장애(중단, 응답 유실, 처리 중 종료)가 나도 결과가 유실되거나 중복 반영되지 않는다"를 증명하는 것입니다. 이를 검증하려면 **장애를 내고, 커밋한 뒤 응답을 끊는 가상 수신 서버(`receiver`)**와, 그 서버 쪽의 고유 제약이 실제로 중복을 막는지 확인할 별도 DB가 필요합니다.
 
 2. **검증을 JUnit 한 가지로 모은 이유**:
-   개발 기간이 5일이므로 Python simulator·reconcile 스크립트·docker 장애 스크립트를 따로 만들지 않았습니다. 같은 입력과 판정을 테스트 코드로 만들면 `.\gradlew.bat integrationTest` 한 번으로 모든 시나리오를 재현할 수 있고, 결과 수치도 테스트 실행 결과에서 바로 얻습니다.
+   개발 기간이 5일이므로 Python simulator·reconcile 스크립트·docker 장애 스크립트를 따로 만들지 않았습니다. 같은 입력과 판정을 테스트 코드로 만들면 `.\gradlew.bat integrationTest`(macOS는 `./gradlew integrationTest`) 한 번으로 모든 시나리오를 재현할 수 있고, 결과 수치도 테스트 실행 결과에서 바로 얻습니다.
 
 3. **5일 범위에서 뺀 것**:
    Python 도구, 다중 gateway 컨테이너와 `docker kill` 시나리오, receiver의 `SLOW`·`ERROR_RATE` 모드, 지표·경보, 운영 API 인증. 각 항목을 뺀 이유는 설계 문서마다 마지막 절("v1.0에서 뺀 것")에 있습니다.

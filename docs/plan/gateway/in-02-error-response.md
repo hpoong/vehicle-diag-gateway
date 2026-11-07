@@ -61,8 +61,14 @@ RFC 9457 기반의 기존 `GlobalExceptionHandler` 체계를 확장하여 다음
 - **TEST-03 (DB 장애)**: `CannotCreateTransactionException` 및 MyBatis 커넥션 실패 시 `503 Service Unavailable` 변환 및 내부 메시지 은닉 확인.
 
 ```powershell
-# 검증 실행 명령
-.\gateway\gradlew.bat -p . :web-support:integrationTest
-.\gateway\gradlew.bat -p . :gateway:integrationTest
+# 검증 실행 명령 - Windows (PowerShell)
+.\gradlew.bat :web-support:integrationTest
+.\gradlew.bat :gateway:integrationTest
+```
+
+```sh
+# 검증 실행 명령 - macOS (zsh)
+./gradlew :web-support:integrationTest
+./gradlew :gateway:integrationTest
 ```
 

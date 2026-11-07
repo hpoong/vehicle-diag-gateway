@@ -1,5 +1,0 @@
-rootProject.name = 'gateway'
-
-// gateway 디렉터리에서 실행하는 기존 Wrapper 명령도 지원한다.
-include 'web-support'
-project(':web-support').projectDir = file('../web-support')

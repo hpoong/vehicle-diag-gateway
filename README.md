@@ -16,21 +16,32 @@
 outbox 워커, 운영 API는 후속 구현 대상입니다. 공통 HTTP 응답·예외 처리는 구성되어 있습니다.
 `receiver/`와 시나리오 테스트(JUnit + Testcontainers, 정합성 대조 포함)는 후속 단계에서 구성합니다.
 
-## 로컬 실행 (PowerShell)
+## 로컬 실행
 
 JDK 17과 Docker Desktop의 Linux 컨테이너 엔진이 필요합니다. Gradle은 Wrapper가 내려받습니다.
 첫 실행에는 의존성과 컨테이너 이미지 다운로드를 위한 네트워크 연결이 필요합니다.
+모든 명령은 저장소 루트에서 실행합니다. Gradle Wrapper는 루트에 하나만 있습니다.
+
+**Windows (PowerShell)**
 
 ```powershell
 # 설치 경로에 맞게 지정
 $env:JAVA_HOME = 'D:\Java\jdk-17'
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 
-# 저장소 루트에서 PostgreSQL 실행
 docker compose up -d --wait postgres
+.\gradlew.bat :gateway:bootRun
+```
 
-Set-Location gateway
-.\gradlew.bat bootRun
+**macOS (zsh)**
+
+```sh
+# 설치 경로에 맞게 지정 (~/.zshrc에 넣어 두면 매번 지정하지 않아도 됩니다)
+export JAVA_HOME="$HOME/java/jdk-17.0.2.jdk/Contents/Home"
+export PATH="$JAVA_HOME/bin:$PATH"
+
+docker compose up -d --wait postgres
+./gradlew :gateway:bootRun
 ```
 
 기동 시 Flyway가 gateway DB에 V1~V3 스키마를 적용합니다.
@@ -43,23 +54,33 @@ Compose의 비밀번호 설정은 빈 데이터 볼륨을 최초 초기화할 �
 
 ## 빌드와 검증
 
-`gateway/`에서 실행합니다.
+저장소 루트에서 실행합니다.
+
+**Windows (PowerShell)**
 
 ```powershell
 .\gradlew.bat clean build
 # DB 없이 공통 HTTP 응답/예외 처리 검증
 .\gradlew.bat :web-support:integrationTest
 # Docker 필요: 실제 PostgreSQL 16으로 Flyway V1~V3와 health 확인
-.\gradlew.bat integrationTest
-java -jar build/libs/gateway-0.0.1-SNAPSHOT.jar
+.\gradlew.bat :gateway:integrationTest
+java -jar gateway\build\libs\gateway-0.0.1-SNAPSHOT.jar
 ```
 
-현재 단위 테스트는 없으며, DB 기동 검증은 별도 `integrationTest` 태스크입니다.
-CI에서는 `build integrationTest`를 함께 실행합니다. H2는 사용하지 않습니다.
-Linux/macOS에서는 `sh ./gradlew`로 같은 태스크를 실행할 수 있습니다.
+**macOS (zsh)**
 
-저장소 루트에서는 `.\gateway\gradlew.bat -p . :gateway:build :web-support:integrationTest`로 빌드합니다.
-공통 응답 사용법과 receiver 연결 방법은 [공통 웹 기반](docs/web-support.md)을 참고하세요.
+```sh
+./gradlew clean build
+# DB 없이 공통 HTTP 응답/예외 처리 검증
+./gradlew :web-support:integrationTest
+# Docker 필요: 실제 PostgreSQL 16으로 Flyway V1~V3와 health 확인
+./gradlew :gateway:integrationTest
+java -jar gateway/build/libs/gateway-0.0.1-SNAPSHOT.jar
+```
+
+단위 테스트는 `test`, DB 기동 검증은 별도 `integrationTest` 태스크입니다.
+CI에서는 `build integrationTest`를 함께 실행합니다. H2는 사용하지 않습니다.
+공통 응답 사용법과 receiver 연결 방법은 [공통 웹 기반](docs/architecture/web-support.md)을 참고하세요.
 
 로컬 DB 정지(데이터 유지): 저장소 루트에서 `docker compose down`.
 단말 인증은 설계 범위 밖이며, 실제 서비스에서는 인증 주체와 `deviceId`를 대조해야 합니다.

@@ -68,14 +68,20 @@ diag:
 공통 필터와 Advice는 Boot 자동 설정으로 등록됩니다. 애플리케이션의 컴포넌트 스캔 범위를 넓힐 필요가 없습니다.
 공통 패키지를 별도로 스캔하면 등록이 중복될 수 있으므로 기본 서비스 패키지 스캔을 유지합니다.
 receiver의 업무 에러는 자신의 패키지에서 `ErrorCode` 구현으로 추가합니다.
-gateway 디렉터리에서의 기존 Wrapper 명령도 계속 지원하며, 서비스가 추가된 이후에는 루트 빌드를 기준으로 사용합니다.
+Gradle Wrapper는 저장소 루트에 하나만 두고, 모든 서비스를 루트 빌드로 실행합니다.
 
 ## 검증
 
 저장소 루트에서 실행합니다. web-support의 HTTP 검증은 DB와 Docker 없이 수행합니다.
 
 ```powershell
-.\gateway\gradlew.bat -p . :web-support:integrationTest :gateway:build
+# Windows (PowerShell)
+.\gradlew.bat :web-support:integrationTest :gateway:build
+```
+
+```sh
+# macOS (zsh)
+./gradlew :web-support:integrationTest :gateway:build
 ```
 
 실제 DB 기동과 Flyway 검증은 기존 `:gateway:integrationTest`로 별도 실행합니다(Docker 필요).
