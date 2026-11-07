@@ -85,7 +85,7 @@ flowchart LR
 
 ```text
 vehicle-diag-gateway/
-├─ settings.gradle           # 루트 Gradle 멀티 프로젝트 (web-support, gateway; receiver 추가 예정)
+├─ settings.gradle           # 루트 Gradle 멀티 프로젝트 (web-support, gateway, receiver)
 ├─ gradlew, gradlew.bat      # Gradle Wrapper 8.14.3 (루트에 하나만 둡니다)
 ├─ web-support/              # 두 서비스가 공유하는 HTTP 응답·예외 처리·요청 추적 라이브러리
 ├─ gateway/                  # [Spring Boot #1] 진단 연계 게이트웨이

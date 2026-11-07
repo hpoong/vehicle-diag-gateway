@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: vehicle-diag-receiver
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+  mvc:
+    problemdetails:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 10s
+
+diag:
+  web:
+    problem-type-prefix: 'urn:diag-receiver:error:'
+
+server:
+  port: ${RECEIVER_PORT:8081}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never

@@ -51,7 +51,10 @@ Bean Validation 오류는 `errors` 목록으로 반환합니다. 잘못된 JSON,
 응답 헤더와 에러 본문의 `requestId`에 같은 값을 사용하며 처리 중 MDC `requestId`에 넣습니다.
 요청 종료 시 기존 MDC 값을 복원합니다. 비동기 작업 실행 스레드로의 MDC 전파는 별도 설정이 필요합니다.
 
-## receiver 추가
+## receiver 구성
+
+receiver는 공통 웹 기반과 Actuator를 연결한 기본 뼈대입니다. DB·Flyway와 업무 기능은 아직 추가하지 않았습니다.
+서비스 구성 시 다음 기준을 따릅니다.
 
 1. 루트 `settings.gradle`에 `include 'receiver'`를 추가합니다.
 2. receiver를 독립 Spring Boot 애플리케이션으로 만들고 `implementation project(':web-support')`을 추가합니다.

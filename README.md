@@ -8,6 +8,7 @@
 - Java 17, Spring Boot 3.5.16, Gradle Wrapper 8.14.3
 - Spring MVC, Bean Validation, MyBatis 3.0.5, Flyway, PostgreSQL 16, Actuator
 - `gateway/`: 독립 실행 Spring Boot 애플리케이션
+- `receiver/`: 독립 실행 Spring Boot 애플리케이션 기본 뼈대 (업무 로직·DB 연동 없음)
 - `web-support/`: 두 서비스가 재사용하는 일반 JAR (응답, 예외, 요청 ID 추적)
 - `ingest`, `policy`, `delivery`, `ops`, `common`: 설계 책임별 패키지
 - `gateway/src/main/resources/db/migration/`: 수신·outbox·운영 감사 테이블
@@ -16,7 +17,7 @@
 [수신 기능 구현 현황](docs/plan/gateway/01-ingest-design/README.md)에서 단계별 동작과 검증 기록을 확인할 수 있습니다.
 [일반 설명용](docs/flow/gateway-overview.html)과 [개발자용](docs/flow/gateway-developer.html) 슬라이드 HTML을 제공합니다.
 outbox 전송 워커와 운영 API는 후속 구현 대상입니다.
-`receiver/`와 시나리오 테스트(JUnit + Testcontainers, 정합성 대조 포함)는 후속 단계에서 구성합니다.
+receiver의 업무 기능과 시나리오 테스트(JUnit + Testcontainers, 정합성 대조 포함)는 후속 단계에서 구성합니다.
 
 ## 로컬 실행
 
@@ -53,6 +54,21 @@ docker compose up -d --wait postgres
 환경변수 `GATEWAY_DB_URL`, `GATEWAY_DB_USERNAME`, `GATEWAY_DB_PASSWORD`, `GATEWAY_PORT`로 변경할 수 있습니다.
 Compose의 `POSTGRES_PORT`를 변경하면 `GATEWAY_DB_URL`도 같은 포트로 맞춥니다.
 Compose의 비밀번호 설정은 빈 데이터 볼륨을 최초 초기화할 때 적용됩니다.
+
+receiver는 DB 없이 별도 터미널에서 실행합니다.
+
+```powershell
+# Windows (PowerShell)
+.\gradlew.bat :receiver:bootRun
+```
+
+```sh
+# macOS (zsh)
+./gradlew :receiver:bootRun
+```
+
+상태 확인: `http://localhost:8081/actuator/health`
+환경변수 `RECEIVER_PORT`로 포트를 변경할 수 있습니다.
 
 ## 빌드와 검증
 
