@@ -13,7 +13,7 @@
 - `gateway/src/main/resources/db/migration/`: 수신·outbox·운영 감사 테이블
 
 진단 결과 수신·정규화·중복 판정·공통/브랜드 검증·원자적 저장·최신 상태 갱신·outbox 예약·결과 조회를 구현했습니다.
-[수신 기능 구현 현황](docs/plan/gateway/README.md)에서 단계별 동작과 검증 기록을 확인할 수 있습니다.
+[수신 기능 구현 현황](docs/plan/gateway/01-ingest-design/README.md)에서 단계별 동작과 검증 기록을 확인할 수 있습니다.
 [일반 설명용](docs/flow/gateway-overview.html)과 [개발자용](docs/flow/gateway-developer.html) 슬라이드 HTML을 제공합니다.
 outbox 전송 워커와 운영 API는 후속 구현 대상입니다.
 `receiver/`와 시나리오 테스트(JUnit + Testcontainers, 정합성 대조 포함)는 후속 단계에서 구성합니다.

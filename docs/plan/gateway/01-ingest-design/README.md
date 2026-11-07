@@ -51,7 +51,7 @@ TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
 
 ## 흐름 발표 자료
 
-- [일반 설명용](../../flow/gateway-overview.html)
-- [개발자 설명용](../../flow/gateway-developer.html)
+- [일반 설명용](../../../flow/gateway-overview.html)
+- [개발자 설명용](../../../flow/gateway-developer.html)
 
 브라우저에서 직접 열 수 있는 독립 HTML입니다. 좌우 화살표로 이동하고 인쇄 시 전체 슬라이드를 출력할 수 있습니다.
