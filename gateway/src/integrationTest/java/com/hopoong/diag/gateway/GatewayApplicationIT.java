@@ -21,7 +21,7 @@ class GatewayApplicationIT {
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @Autowired
-    com.hopoong.diag.gateway.delivery.DeliveryProperties deliveryProperties;
+    com.hopoong.diag.gateway.delivery.config.DeliveryProperties deliveryProperties;
 
     @Autowired
     JdbcTemplate jdbc;

@@ -1,6 +1,6 @@
 package com.hopoong.diag.gateway.delivery;
 
-import com.hopoong.diag.gateway.ingest.IngestService;
+import com.hopoong.diag.gateway.ingest.application.IngestService;
 import com.hopoong.diag.testsupport.OutboxFixture;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +11,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.*;
+import com.hopoong.diag.gateway.delivery.application.AttemptOutcome;
+import com.hopoong.diag.gateway.delivery.application.DeliveryOutcome;
+import com.hopoong.diag.gateway.delivery.application.DeliveryRecorder;
+import com.hopoong.diag.gateway.delivery.application.OutboxClaimer;
+import com.hopoong.diag.gateway.delivery.config.DeliveryProperties;
+import com.hopoong.diag.gateway.delivery.persistence.ClaimedEvent;
 
 @Testcontainers
 @SpringBootTest(properties = "gateway.delivery.max-attempts=3")

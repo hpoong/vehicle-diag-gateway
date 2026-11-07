@@ -1,9 +1,14 @@
 package com.hopoong.diag.gateway.policy;
-import com.hopoong.diag.gateway.ingest.*;
+import com.hopoong.diag.gateway.ingest.application.*;
+import com.hopoong.diag.gateway.ingest.domain.*;
+import com.hopoong.diag.gateway.ingest.persistence.*;
+import com.hopoong.diag.gateway.ingest.web.*;
 import java.time.*;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import com.hopoong.diag.gateway.ingest.domain.DiagnosticResultCommand;
+import com.hopoong.diag.gateway.ingest.domain.EcuCommand;
 
 class CommonRuleValidatorTest {
     private final CommonRuleValidator validator = new CommonRuleValidator();

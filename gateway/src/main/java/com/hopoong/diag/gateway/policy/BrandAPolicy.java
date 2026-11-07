@@ -1,6 +1,6 @@
 package com.hopoong.diag.gateway.policy;
 
-import com.hopoong.diag.gateway.ingest.DiagnosticResultCommand;
+import com.hopoong.diag.gateway.ingest.domain.DiagnosticResultCommand;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Component;

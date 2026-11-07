@@ -1,8 +1,14 @@
 package com.hopoong.diag.testsupport;
 
-import com.hopoong.diag.gateway.ingest.*;
+import com.hopoong.diag.gateway.ingest.application.*;
+import com.hopoong.diag.gateway.ingest.domain.*;
+import com.hopoong.diag.gateway.ingest.persistence.*;
+import com.hopoong.diag.gateway.ingest.web.*;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.hopoong.diag.gateway.ingest.application.IngestService;
+import com.hopoong.diag.gateway.ingest.web.DiagnosticResultRequest;
+import com.hopoong.diag.gateway.ingest.web.EcuRequest;
 
 public final class OutboxFixture {
     public static final String VIN = "1HGCM82633A004352";

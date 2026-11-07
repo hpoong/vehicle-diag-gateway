@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.hopoong.diag.gateway.ingest.DiagnosticResultMapper">
-    <resultMap id="existingResult" type="com.hopoong.diag.gateway.ingest.ExistingResult">
+<mapper namespace="com.hopoong.diag.gateway.ingest.persistence.DiagnosticResultMapper">
+    <resultMap id="existingResult" type="com.hopoong.diag.gateway.ingest.persistence.ExistingResult">
         <constructor>
             <idArg column="id" javaType="_long"/>
             <arg column="payload_hash" javaType="java.lang.String"/>
@@ -19,7 +19,7 @@
          WHERE r.device_id = #{deviceId} AND r.event_id = #{eventId}
     </select>
 
-    <resultMap id="inserted" type="com.hopoong.diag.gateway.ingest.InsertedResult">
+    <resultMap id="inserted" type="com.hopoong.diag.gateway.ingest.persistence.InsertedResult">
         <constructor><idArg column="id" javaType="_long"/><arg column="received_at" javaType="java.time.OffsetDateTime"/></constructor>
     </resultMap>
     <select id="insertResult" resultMap="inserted" affectData="true" flushCache="true">
@@ -44,7 +44,7 @@
         WHERE (vehicle_ecu_latest.occurred_at, vehicle_ecu_latest.result_id)
             &lt; (EXCLUDED.occurred_at, EXCLUDED.result_id)
     </insert>
-    <resultMap id="result" type="com.hopoong.diag.gateway.ingest.DiagnosticResultMapper$ResultRow">
+    <resultMap id="result" type="com.hopoong.diag.gateway.ingest.persistence.DiagnosticResultMapper$ResultRow">
         <constructor>
             <idArg column="id" javaType="_long"/>
             <arg column="device_id" javaType="java.lang.String"/>
@@ -61,7 +61,7 @@
         SELECT id, device_id, event_id, brand, vin, session_id, occurred_at, received_at, policy_code
         FROM diagnostic_result WHERE id = #{id}
     </select>
-    <resultMap id="observation" type="com.hopoong.diag.gateway.ingest.ObservationRow">
+    <resultMap id="observation" type="com.hopoong.diag.gateway.ingest.persistence.ObservationRow">
         <constructor>
             <arg column="result_id" javaType="_long"/>
             <arg column="ecu_id" javaType="java.lang.String"/>

@@ -1,8 +1,11 @@
 package com.hopoong.diag.gateway;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hopoong.diag.gateway.ingest.*;
-import com.hopoong.diag.gateway.delivery.OutboxMapper;
+import com.hopoong.diag.gateway.ingest.application.*;
+import com.hopoong.diag.gateway.ingest.domain.*;
+import com.hopoong.diag.gateway.ingest.persistence.*;
+import com.hopoong.diag.gateway.ingest.web.*;
+import com.hopoong.diag.gateway.delivery.persistence.OutboxMapper;
 import com.hopoong.diag.gateway.policy.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -24,6 +27,12 @@ import org.testcontainers.junit.jupiter.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.hopoong.diag.gateway.ingest.application.IngestResult;
+import com.hopoong.diag.gateway.ingest.application.IngestService;
+import com.hopoong.diag.gateway.ingest.domain.DiagnosticResultCommand;
+import com.hopoong.diag.gateway.ingest.web.DiagnosticResultRequest;
+import com.hopoong.diag.gateway.policy.ResultValidationPolicy;
+import com.hopoong.diag.gateway.policy.Violation;
 
 @Testcontainers
 @SpringBootTest

@@ -1,7 +1,10 @@
 package com.hopoong.diag.gateway;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hopoong.diag.gateway.ingest.*;
-import com.hopoong.diag.gateway.delivery.OutboxMapper;
+import com.hopoong.diag.gateway.ingest.application.*;
+import com.hopoong.diag.gateway.ingest.domain.*;
+import com.hopoong.diag.gateway.ingest.persistence.*;
+import com.hopoong.diag.gateway.ingest.web.*;
+import com.hopoong.diag.gateway.delivery.persistence.OutboxMapper;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +17,10 @@ import org.testcontainers.junit.jupiter.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.hopoong.diag.gateway.ingest.application.IngestService;
+import com.hopoong.diag.gateway.ingest.application.OutboxDraft;
+import com.hopoong.diag.gateway.ingest.application.OutboxPayloadFactory;
+import com.hopoong.diag.gateway.ingest.web.DiagnosticResultRequest;
 
 @Testcontainers @SpringBootTest
 class IngestRollbackIT {

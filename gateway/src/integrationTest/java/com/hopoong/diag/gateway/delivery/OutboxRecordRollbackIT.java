@@ -5,6 +5,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
+import com.hopoong.diag.gateway.delivery.application.AttemptOutcome;
+import com.hopoong.diag.gateway.delivery.persistence.DeliveryAttemptMapper;
 
 class OutboxRecordRollbackIT extends DeliveryDatabaseITSupport {
     @MockitoSpyBean DeliveryAttemptMapper attempts;

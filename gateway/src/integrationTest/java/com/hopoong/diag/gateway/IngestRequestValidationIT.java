@@ -1,6 +1,6 @@
 package com.hopoong.diag.gateway;
 
-import com.hopoong.diag.gateway.ingest.IngestService;
+import com.hopoong.diag.gateway.ingest.application.IngestService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -60,8 +60,8 @@ class IngestRequestValidationIT {
 
     @Test
     void passesValidRequestWithEmptyEcusToService() throws Exception {
-        org.mockito.Mockito.when(service.ingest(any())).thenReturn(new com.hopoong.diag.gateway.ingest.IngestResult(
-                com.hopoong.diag.gateway.ingest.IngestResult.Outcome.ACCEPTED, 1, "device_1", "event_1", "STANDARD-v1",
+        org.mockito.Mockito.when(service.ingest(any())).thenReturn(new com.hopoong.diag.gateway.ingest.application.IngestResult(
+                com.hopoong.diag.gateway.ingest.application.IngestResult.Outcome.ACCEPTED, 1, "device_1", "event_1", "STANDARD-v1",
                 java.time.Instant.now(), java.util.UUID.randomUUID(), "PENDING"));
         String json = VALID.replace("[{\"ecuId\":\"ECU_1\",\"swVersion\":\"1\",\"dtcCodes\":[\"P0123\"]}]", "[]");
         mvc.perform(post("/api/v1/diagnostic-results").contentType(MediaType.APPLICATION_JSON).content(json))

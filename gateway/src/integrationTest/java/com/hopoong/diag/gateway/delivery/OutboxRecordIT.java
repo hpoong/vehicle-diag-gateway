@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.*;
 import static org.assertj.core.api.Assertions.*;
+import com.hopoong.diag.gateway.delivery.application.AttemptOutcome;
+import com.hopoong.diag.gateway.delivery.application.RecordResult;
+import com.hopoong.diag.gateway.delivery.persistence.ClaimedEvent;
 
 @ExtendWith(OutputCaptureExtension.class)
 class OutboxRecordIT extends DeliveryDatabaseITSupport {

@@ -1,7 +1,7 @@
 package com.hopoong.diag.gateway.policy;
 
-import com.hopoong.diag.gateway.ingest.DiagnosticResultCommand;
-import com.hopoong.diag.gateway.ingest.EcuCommand;
+import com.hopoong.diag.gateway.ingest.domain.DiagnosticResultCommand;
+import com.hopoong.diag.gateway.ingest.domain.EcuCommand;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;

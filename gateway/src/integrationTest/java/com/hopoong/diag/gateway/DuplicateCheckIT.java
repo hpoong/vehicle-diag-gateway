@@ -1,10 +1,10 @@
 package com.hopoong.diag.gateway;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hopoong.diag.gateway.ingest.DiagnosticResultNormalizer;
-import com.hopoong.diag.gateway.ingest.DiagnosticResultRequest;
-import com.hopoong.diag.gateway.ingest.IngestResult;
-import com.hopoong.diag.gateway.ingest.IngestService;
+import com.hopoong.diag.gateway.ingest.application.DiagnosticResultNormalizer;
+import com.hopoong.diag.gateway.ingest.web.DiagnosticResultRequest;
+import com.hopoong.diag.gateway.ingest.application.IngestResult;
+import com.hopoong.diag.gateway.ingest.application.IngestService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

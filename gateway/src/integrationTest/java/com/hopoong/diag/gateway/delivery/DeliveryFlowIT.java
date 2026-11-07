@@ -16,6 +16,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.hopoong.diag.gateway.delivery.application.DeliveryRecorder;
+import com.hopoong.diag.gateway.delivery.application.DeliveryService;
+import com.hopoong.diag.gateway.delivery.application.RunSummary;
+import com.hopoong.diag.gateway.delivery.client.ReceiverClient;
 
 @SpringBootTest(properties = {"gateway.delivery.backoff.base=0s", "gateway.delivery.read-timeout=500ms",
         "gateway.delivery.connect-timeout=500ms", "gateway.delivery.max-attempts=3"})

@@ -1,6 +1,6 @@
 package com.hopoong.diag.gateway.policy;
 
-import com.hopoong.diag.gateway.ingest.DiagnosticResultCommand;
+import com.hopoong.diag.gateway.ingest.domain.DiagnosticResultCommand;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
