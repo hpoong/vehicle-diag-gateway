@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hopoong.diag.gateway.ops.persistence.OpsMapper">
+    <!-- st는 include property의 정적 상수만 허용한다. 요청 파라미터를 치환하지 않는다. -->
+    <sql id="statusIs">status = '${st}'</sql>
+    <resultMap id="summaryRow" type="com.hopoong.diag.gateway.ops.persistence.SummaryRow">
+        <constructor>
+            <arg column="as_of" javaType="java.time.OffsetDateTime"/>
+            <arg column="pending" javaType="_long"/>
+            <arg column="sent" javaType="_long"/>
+            <arg column="dead" javaType="_long"/>
+            <arg column="total" javaType="_long"/>
+            <arg column="oldest_pending_age_seconds" javaType="java.lang.Long"/>
+            <arg column="dead_non_retryable" javaType="_long"/>
+            <arg column="dead_max_attempts" javaType="_long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="eventRow" type="com.hopoong.diag.gateway.ops.persistence.EventRow">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="event_id" javaType="java.lang.String"/>
+            <arg column="result_id" javaType="_long"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="attempt_count" javaType="_int"/>
+            <arg column="cycle_no" javaType="_int"/>
+            <arg column="next_attempt_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="locked_by" javaType="java.lang.String"/>
+            <arg column="locked_until" javaType="java.time.OffsetDateTime"/>
+            <arg column="last_outcome" javaType="java.lang.String"/>
+            <arg column="last_http_status" javaType="java.lang.Integer"/>
+            <arg column="last_error" javaType="java.lang.String"/>
+            <arg column="dead_reason" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="sent_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="dead_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="attemptRow" type="com.hopoong.diag.gateway.ops.persistence.AttemptRow">
+        <constructor>
+            <arg column="cycle_no" javaType="_int"/>
+            <arg column="attempt_no" javaType="_int"/>
+            <arg column="worker_id" javaType="java.lang.String"/>
+            <arg column="outcome" javaType="java.lang.String"/>
+            <arg column="http_status" javaType="java.lang.Integer"/>
+            <arg column="error_code" javaType="java.lang.String"/>
+            <arg column="latency_ms" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="requeueRow" type="com.hopoong.diag.gateway.ops.persistence.RequeueRow">
+        <constructor>
+            <arg column="new_cycle_no" javaType="_int"/>
+            <arg column="before_attempt_count" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <select id="summary" resultMap="summaryRow">
+        SELECT date_trunc('milliseconds', now()) AS as_of,
+               count(*) FILTER (WHERE <include refid="statusIs"><property name="st" value="PENDING"/></include>) AS pending,
+               count(*) FILTER (WHERE <include refid="statusIs"><property name="st" value="SENT"/></include>) AS sent,
+               count(*) FILTER (WHERE <include refid="statusIs"><property name="st" value="DEAD"/></include>) AS dead,
+               count(*) AS total,
+               floor(extract(epoch FROM now() - min(created_at) FILTER (WHERE
+                    <include refid="statusIs"><property name="st" value="PENDING"/></include>)))::bigint AS oldest_pending_age_seconds,
+               count(*) FILTER (WHERE <include refid="statusIs"><property name="st" value="DEAD"/></include>
+                    AND dead_reason='NON_RETRYABLE') AS dead_non_retryable,
+               count(*) FILTER (WHERE <include refid="statusIs"><property name="st" value="DEAD"/></include>
+                    AND dead_reason='MAX_ATTEMPTS') AS dead_max_attempts
+        FROM outbox_event
+    </select>
+    <sql id="eventColumns">
+        id, event_id::text, result_id, status, attempt_count, cycle_no, next_attempt_at, locked_by,
+        locked_until, last_outcome, last_http_status, last_error, dead_reason, created_at, updated_at, sent_at, dead_at
+    </sql>
+    <select id="findEvents" resultMap="eventRow">
+        SELECT <include refid="eventColumns"/> FROM outbox_event
+        <choose>
+            <when test="status == 'PENDING'">WHERE <include refid="statusIs"><property name="st" value="PENDING"/></include> ORDER BY next_attempt_at, id</when>
+            <when test="status == 'SENT'">WHERE <include refid="statusIs"><property name="st" value="SENT"/></include> ORDER BY sent_at DESC, id</when>
+            <otherwise>WHERE <include refid="statusIs"><property name="st" value="DEAD"/></include> ORDER BY dead_at DESC, id</otherwise>
+        </choose>
+        LIMIT #{limit}
+    </select>
+    <select id="findEvent" resultMap="eventRow">
+        SELECT <include refid="eventColumns"/> FROM outbox_event WHERE id=#{id}
+    </select>
+    <select id="existsEvent" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM outbox_event WHERE id=#{id})
+    </select>
+    <select id="findAttempts" resultMap="attemptRow">
+        SELECT cycle_no, attempt_no, worker_id, outcome, http_status, error_code, latency_ms
+        FROM delivery_attempt WHERE outbox_id=#{outboxId} ORDER BY id
+    </select>
+    <select id="requeue" resultMap="requeueRow" affectData="true" flushCache="true">
+        WITH before AS (
+            SELECT id, attempt_count FROM outbox_event
+            WHERE id=#{outboxId} AND <include refid="statusIs"><property name="st" value="DEAD"/></include>
+            FOR UPDATE
+        )
+        UPDATE outbox_event o SET status='PENDING', attempt_count=0, cycle_no=o.cycle_no+1,
+            next_attempt_at=now(), dead_reason=NULL, dead_at=NULL,
+            claim_token=NULL, locked_by=NULL, locked_until=NULL, updated_at=now()
+        FROM before b WHERE o.id=b.id
+        RETURNING o.cycle_no AS new_cycle_no, b.attempt_count AS before_attempt_count
+    </select>
+    <insert id="insertActionLog">
+        INSERT INTO ops_action_log(action, outbox_id, operator, reason, before_status, after_status,
+                                   before_attempt_count, new_cycle_no, request_id)
+        VALUES ('REQUEUE', #{outboxId}, #{operator}, #{reason}, 'DEAD', 'PENDING',
+                #{beforeAttemptCount}, #{newCycleNo}, #{requestId})
+    </insert>
+</mapper>

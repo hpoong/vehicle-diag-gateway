@@ -25,6 +25,13 @@ public final class OutboxFixture {
         }
         return ids;
     }
+    public void markSent(long id) {
+        jdbc.update("UPDATE outbox_event SET status='SENT', sent_at=now(), last_outcome='SUCCESS', dead_reason=NULL, dead_at=NULL, claim_token=NULL, locked_by=NULL, locked_until=NULL WHERE id=?", id);
+    }
+    public void markDead(long id, String reason, int attemptCount) {
+        jdbc.update("UPDATE outbox_event SET status='DEAD', dead_reason=?, dead_at=now(), sent_at=NULL, attempt_count=?, last_outcome=?, claim_token=NULL, locked_by=NULL, locked_until=NULL WHERE id=?",
+                reason, attemptCount, "MAX_ATTEMPTS".equals(reason) ? "RETRYABLE" : "NON_RETRYABLE", id);
+    }
     public void reset() {
         jdbc.execute("TRUNCATE ops_action_log, delivery_attempt, outbox_event, vehicle_ecu_latest, ecu_observation, diagnostic_result RESTART IDENTITY CASCADE");
     }

@@ -68,3 +68,17 @@ tasks.register('integrationTest', Test) {
     classpath = sourceSets.integrationTest.runtimeClasspath
     shouldRunAfter tasks.test
 }
+
+// receiver의 리소스는 gateway의 Flyway/MyBatis 탐색 경로에서 분리한다.
+def receiverItResources = tasks.register('receiverItResources', Sync) {
+    from(rootProject.file('receiver/src/main/resources')) { exclude 'logback-spring.xml' }
+    into(layout.buildDirectory.dir('receiver-it-resources/receiver-it'))
+}
+dependencies {
+    integrationTestImplementation files(rootProject.file('receiver/build/classes/java/main')) {
+        builtBy ':receiver:classes'
+    }
+    integrationTestRuntimeOnly files(layout.buildDirectory.dir('receiver-it-resources')) {
+        builtBy receiverItResources
+    }
+}

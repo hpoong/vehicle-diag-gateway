@@ -9,6 +9,7 @@
 ```text
 docs/
 ├── README.md                      # 📌 (본 문서) 문서 전체 목차 및 네비게이션
+├── results.md                     # 장애 시나리오 실제 실행 결과
 │
 ├── architecture/                  # 🏛️ 시스템 아키텍처 및 모듈 명세
 │   ├── overview.md                # 전체 시스템 구성도, 서비스 역할, 처리 흐름
@@ -107,3 +108,8 @@ docs/
 - [RC-01~10 구현 현황 및 검증 기록](plan/receiver/03-receiver-design/README.md)
 - [Receiver 일반 설명용 슬라이드](flow/receiver-overview.html): 품질 건 반영, 재전송·응답 유실, 장애 모드와 naive 비교
 - [Receiver 개발자용 슬라이드](flow/receiver-developer.html): API·검증·hash, 원자적 저장과 동시성, 장애 주입·로그·실행·검증
+
+- [운영 API·장애 시나리오 구현](plan/gateway/04-ops-verify-design/README.md)
+  - 멀티 프로젝트, 실제 receiver 테스트 기반, 정합성 대조, 운영 API와 재처리
+- [시나리오 검증 결과](results.md)
+  - S1~S5·S7~S10·S12 실제 수치와 기본/비교 모드 대조
