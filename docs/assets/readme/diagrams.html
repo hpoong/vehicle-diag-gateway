@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vehicle Diagnostic Gateway · README Diagrams</title>
+<style>
+:root{--ink:#18283b;--muted:#64758b;--line:#dbe4ef;--blue:#315ee8;--teal:#087f75;--amber:#a36513}
+*{box-sizing:border-box}body{margin:0;background:#f3f6fb;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;-webkit-font-smoothing:antialiased}.canvas{width:1120px;padding:42px 44px 28px;background:radial-gradient(ellipse at top right,#e9efff 0,transparent 48%),#f7f9fc;display:none}.canvas.active{display:block}.eyebrow{font-size:12px;font-weight:800;letter-spacing:2px;color:var(--blue);margin-bottom:12px}h1{font-size:32px;letter-spacing:-1.2px;margin:0 0 12px;line-height:1.25}p{margin:0;color:var(--muted);font-size:16px;line-height:1.65}.header{margin-bottom:30px}.footer{border-top:1px solid var(--line);margin-top:26px;padding-top:15px;display:flex;justify-content:space-between;color:#7b8a9d;font-size:11px;letter-spacing:.5px}.panel{background:white;border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 5px 18px #142a4d04}.tag{display:inline-block;padding:6px 9px;font-size:11px;font-weight:800;border-radius:6px;background:#edf2ff;color:var(--blue);letter-spacing:.5px}.teal{color:var(--teal);background:#e7f6f1}.amber{color:var(--amber);background:#fff3df}.label{font-size:12px;font-weight:700;color:var(--muted)}h2{font-size:22px;letter-spacing:-.6px;margin:12px 0 8px}h3{font-size:17px;margin:0 0 8px}.small{font-size:13px;line-height:1.6}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.arrow{color:#8c9db6;font-size:28px;text-align:center;align-self:center}.arch{display:grid;grid-template-columns:168px 32px 402px 32px 398px;align-items:stretch}.arch .panel{padding:20px}.client{align-self:center;text-align:center}.icon{width:48px;height:48px;margin:0 auto 16px;background:#edf2ff;border:1px solid #d3defc;border-radius:13px;display:grid;place-items:center;font-size:23px;color:var(--blue)}.service-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.service-title strong{font-size:21px}.port{font-size:12px;color:#7c899d}.node{border:1px solid var(--line);background:#f8faff;border-radius:10px;padding:14px 16px;font-size:15px;font-weight:700}.node small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:5px}.transaction{border:1px dashed #a1b8ee;border-radius:12px;padding:12px;margin:10px 0;background:#f5f8ff}.transaction .label{color:var(--blue);margin-bottom:9px}.db{background:#edf8f4;border-color:#c3e7d9}.db small{color:#4f7d70}.v-arrow{text-align:center;color:#8da2c7;font-size:20px;line-height:27px}.bottom-note{margin-top:20px;background:#eaf0fa;border-radius:10px;padding:13px 18px;display:flex;gap:16px;align-items:center;font-size:13px;color:#526780}.bottom-note strong{color:#304e7d;white-space:nowrap}.stages{display:grid;grid-template-columns:1fr 36px 1fr 36px 1fr;align-items:center}.step{min-height:190px}.number{font-size:12px;color:#91a1b7;font-weight:700;letter-spacing:1px;margin-bottom:18px}.step h2{font-size:23px}.step p{font-size:14px}.outcomes{display:grid;gap:10px}.outcome{display:flex;align-items:center;gap:15px;border-radius:12px;padding:17px;background:#e8f6ef;border:1px solid #c7e7d7}.outcome.warn{background:#fff5e5;border-color:#efddbd}.outcome strong{font-size:19px;width:56px;color:var(--teal)}.outcome.warn strong{color:var(--amber)}.outcome p{font-size:13px;line-height:1.5}.callout{border-left:3px solid var(--blue);padding:12px 17px;background:#edf2ff;margin-top:22px;color:#35517a;font-size:14px;line-height:1.65}.sequence{background:white;border:1px solid var(--line);border-radius:18px;overflow:hidden}.seq-head{display:grid;grid-template-columns:1fr 1fr 1fr;background:#edf2fb;padding:18px 0;text-align:center;font-size:15px;font-weight:800}.seq-row{display:grid;grid-template-columns:78px 1fr 1fr 1fr;position:relative;min-height:68px;align-items:center;padding:8px 22px;border-top:1px solid #eef2f7}.seq-row .idx{width:26px;height:26px;border-radius:50%;background:#edf2ff;color:var(--blue);font-size:12px;display:grid;place-items:center;font-weight:800}.seq-line{grid-column:2/4;border-bottom:2px solid #6a88d6;text-align:center;position:relative;padding:0 8px 9px;font-size:14px}.seq-line:after{content:"";position:absolute;right:-1px;bottom:-6px;border-left:8px solid #6a88d6;border-top:5px solid transparent;border-bottom:5px solid transparent}.seq-line.reverse:after{right:auto;left:-1px;border-left:0;border-right:8px solid #6a88d6}.seq-line.lost{border-bottom:2px dashed #d0876a;color:#a45d42}.seq-line.lost:after{content:"×";border:0;left:0;right:auto;bottom:-12px;font-size:25px;background:white;line-height:22px}.seq-text{font-size:12px;color:#688078;padding-left:18px;line-height:1.5}.seq-row.note{background:#fff8ed;min-height:55px}.seq-row.note .seq-text{grid-column:2/5;color:#91631f;padding:0;font-size:14px}.seq-row.success{background:#f0faf5}.seq-row.success .seq-text{color:#247960}.seq-head span:first-child{padding-left:60px}.recovery{display:grid;grid-template-columns:1fr 38px 1.15fr 38px 1fr;align-items:center}.recovery .panel{min-height:186px}.paths{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}.path{border:1px solid var(--line);background:white;border-radius:13px;padding:17px 20px}.path strong{display:block;font-size:15px;margin-bottom:7px}.path p{font-size:13px}.path .route{margin-top:10px;font-size:12px;font-weight:700;color:var(--blue)}.guard{margin-top:18px;padding:17px 20px;background:#eaf0ff;border-radius:12px;display:flex;gap:18px;align-items:center}.guard strong{white-space:nowrap;color:#3156a6;font-size:14px}.guard p{font-size:13px;color:#4c638d}.comparison{display:grid;grid-template-columns:1fr 1fr;gap:20px}.metric-card{padding:26px}.metric-card.good{border-color:#b4ddce;background:#fcfffd}.metric-card.bad{border-color:#edd8be;background:#fffdf9}.metric-top{display:flex;justify-content:space-between;align-items:center}.metric{font-size:76px;font-weight:800;line-height:1;letter-spacing:-4px;color:var(--teal);margin:28px 0 10px}.metric span{font-size:22px;letter-spacing:0;margin-left:8px}.bad .metric{color:#b57832}.bar-track{height:10px;background:#eef1f5;border-radius:10px;margin:22px 0}.bar{height:100%;border-radius:10px;background:#d5aa70}.zero{width:4px;background:#13917e}.metric-meta{display:flex;gap:22px;border-top:1px solid var(--line);padding-top:16px;font-size:13px;color:#64758b}.metric-meta strong{color:#314458}.source{font-size:12px;margin-top:18px;line-height:1.7;color:#75849a}nav{display:none}
+
+.journey{display:grid;grid-template-columns:1fr 38px 1.2fr 38px 1fr;align-items:stretch}.journey>.arrow{align-self:center}.journey .panel{padding:24px;min-height:262px}.journey h2{margin:18px 0 12px;font-size:24px}.journey p{font-size:15px}.sample{margin-top:20px;border-top:1px solid var(--line);padding-top:15px;font-size:13px;color:#58718c;line-height:1.9}.feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.feature{min-height:185px;padding:24px}.feature h2{font-size:22px;margin:15px 0 10px}.feature p{font-size:15px;line-height:1.7}.feature-index{font-size:12px;letter-spacing:1px;font-weight:800;color:var(--blue)}
+</style>
+</head>
+<body>
+<section class="canvas" id="architecture">
+<div class="header"><div class="eyebrow">01 / SYSTEM ARCHITECTURE</div><h1>진단 결과에서 품질 반영까지, 두 서비스의 책임을 분리</h1><p>Gateway는 저장과 전달을, Receiver는 이벤트의 멱등 반영을 담당합니다.</p></div>
+<div class="arch">
+<div class="client"><div class="icon">↗</div><h3>가상 진단 단말</h3><p class="small">차량 · ECU · DTC<br>시나리오 테스트로 요청</p></div><div class="arrow">→</div>
+<div class="panel"><div class="service-title"><strong>Gateway</strong><span class="port mono">:8080</span></div><div class="node">수신 · 정규화 · 정책 검증<small>중복 요청 판정 / 공통·브랜드 규칙 분리</small></div><div class="transaction"><div class="label">ONE TRANSACTION</div><div class="node db">Gateway DB<small>진단 결과 · ECU 관측 · 최신 상태 · Outbox</small></div></div><div class="v-arrow">↓</div><div class="node">Outbox 전송 워커<small>선점 → HTTP 전송 → 결과 기록</small></div></div>
+<div class="arrow">→</div>
+<div class="panel"><div class="service-title"><strong>Receiver</strong><span class="port mono">:8081</span></div><div class="node">이벤트 ID + 내용 비교<small>동일 이벤트 재전송 / 다른 내용 충돌 판정</small></div><div class="transaction"><div class="label">ONE TRANSACTION</div><div class="node db">Receiver DB<small>수신 이벤트 + ECU·DTC별 품질 건</small></div></div><div class="v-arrow">↓</div><div class="node">신규 반영 / 중복 확인 응답<small>고유 제약으로 같은 이벤트 추가 반영 차단</small></div></div>
+</div><div class="bottom-note"><strong>HTTP ONLY</strong><span>서비스 간 DB 접근 없음 · 테스트만 양쪽 DB를 읽어 접수·전송·반영 결과를 대조</span></div>
+<div class="footer"><span>VEHICLE DIAGNOSTIC GATEWAY</span><span>Java 17 · Spring Boot · PostgreSQL 16</span></div>
+</section>
+<section class="canvas" id="acceptance">
+<div class="header"><div class="eyebrow">02 / ACCEPTANCE & DELIVERY</div><h1>접수 완료와 상대 시스템 반영 완료는 다릅니다</h1><p>202 응답 이후에도 전송 상태를 별도로 추적합니다.</p></div>
+<div class="stages"><div class="panel step"><div class="number">01 · ACCEPT</div><span class="tag">202 ACCEPTED</span><h2>저장 + 전송 예약</h2><p>진단 결과와 Outbox를<br>한 트랜잭션으로 기록</p></div><div class="arrow">→</div><div class="panel step"><div class="number">02 · DELIVER</div><span class="tag">PENDING</span><h2>비동기 전송</h2><p>작업자가 선점해 전달<br>실패 시 조건에 따라 재시도</p></div><div class="arrow">→</div><div class="outcomes"><div class="outcome"><strong>SENT</strong><p>Receiver의<br>반영 확인 응답 수신</p></div><div class="outcome warn"><strong>DEAD</strong><p>자동 전송 중단<br>운영 확인·재처리 필요</p></div></div></div>
+<div class="callout"><strong>조회 기준</strong> &nbsp; 202는 영속 저장·전송 예약의 완료를 뜻합니다.<br>품질 시스템의 반영 여부는 결과 조회 API의 전송 상태로 확인합니다.</div>
+<div class="footer"><span>VEHICLE DIAGNOSTIC GATEWAY</span><span>저장 → 전송 예약 → 상대 반영 확인</span></div>
+</section>
+<section class="canvas" id="response-loss">
+<div class="header"><div class="eyebrow">03 / RESPONSE LOSS & IDEMPOTENCY</div><h1>응답이 사라져도, 같은 이벤트는 한 번만 반영</h1><p>커밋 후 응답 유실 → 같은 ID로 재전송 → 수신 측에서 중복 확인</p></div>
+<div class="sequence"><div class="seq-head"><span>Gateway 전송 워커</span><span>Receiver</span><span>Receiver DB</span></div>
+<div class="seq-row"><span class="idx">1</span><div class="seq-line">이벤트 전송 · eventId = A</div><div class="seq-text">수신 이벤트 + 품질 건<br><strong>COMMIT 완료</strong></div></div>
+<div class="seq-row"><span class="idx">2</span><div class="seq-line lost">반영 후 응답 유실 (커밋 후 응답 보류)</div><div class="seq-text">DB에는 이미 반영됨</div></div>
+<div class="seq-row note"><span class="idx">!</span><div class="seq-text"><strong>UNCERTAIN</strong> &nbsp; 타임아웃만으로 반영 여부를 알 수 없음 → 백오프 후 재시도</div></div>
+<div class="seq-row"><span class="idx">3</span><div class="seq-line">같은 eventId = A 재전송</div><div class="seq-text">고유 제약 + hash 비교<br><strong>추가 반영 없음</strong></div></div>
+<div class="seq-row"><span class="idx">4</span><div class="seq-line reverse">DUPLICATE · 기존 반영 확인 응답</div><div class="seq-text">기존 이벤트 유지</div></div>
+<div class="seq-row success"><span class="idx">✓</span><div class="seq-text" style="grid-column:2/5"><strong>SENT 기록</strong> &nbsp; 여러 번 전송해도 동일 이벤트의 업무 반영은 추가되지 않습니다.</div></div></div>
+<div class="footer"><span>VEHICLE DIAGNOSTIC GATEWAY</span><span>전송 재시도 + 수신 측 멱등 계약</span></div>
+</section>
+<section class="canvas" id="recovery">
+<div class="header"><div class="eyebrow">04 / CLAIM, RETRY & RECOVERY</div><h1>작업이 중단되어도 DB에 복구할 근거를 남깁니다</h1><p>선점과 결과 기록은 짧은 트랜잭션으로, HTTP 호출은 트랜잭션 밖에서 처리합니다.</p></div>
+<div class="recovery"><div class="panel"><span class="tag">PENDING</span><h2>전송 대기</h2><p class="small">전송 예정 시각에 도달한<br>Outbox 이벤트</p></div><div class="arrow">→</div><div class="panel"><span class="tag">PENDING + LEASE</span><h2>작업자 선점</h2><p class="small">SKIP LOCKED · 새 claim token<br>시도 횟수 증가 후 HTTP 전송</p></div><div class="arrow">→</div><div class="panel"><span class="tag teal">SENT</span><h2>전송 완료</h2><p class="small">신규 반영 또는 동일 이벤트의<br>기존 반영 확인</p></div></div>
+<div class="paths"><div class="path"><strong>↶ &nbsp; 재시도 가능 · 응답 불확실 · 작업 중단</strong><p>백오프 + 지터로 재예약하거나 lease 만료 후 재선점합니다.</p><div class="route">선점된 PENDING → 전송 대기 / 재선점</div></div><div class="path"><strong>↶ &nbsp; 영구 실패 · 최대 시도 초과</strong><p>DEAD로 중단하고, 운영자가 사유를 남겨 재처리합니다.</p><div class="route">DEAD → 운영자 재처리 + 감사 기록 → PENDING</div></div></div>
+<div class="guard"><strong>CLAIM TOKEN GUARD</strong><p>이전 작업자의 응답이 늦게 도착해도 현재 토큰과 다르면 상태 갱신을 차단합니다.<br>선점은 별도 상태가 아니라 PENDING에 lease와 소유권을 부여하는 방식입니다.</p></div>
+<div class="footer"><span>VEHICLE DIAGNOSTIC GATEWAY</span><span>선점 → 전송 → 토큰 확인 → 결과 기록</span></div>
+</section>
+<section class="canvas" id="comparison">
+<div class="header"><div class="eyebrow">05 / CONTROLLED FAILURE EXPERIMENT</div><h1>같은 응답 유실, 중복 방어 유무에 따른 차이</h1><p>20건의 이벤트를 커밋한 뒤 응답을 보류하고, 같은 이벤트를 다시 전송했습니다.</p></div>
+<div class="comparison"><div class="panel metric-card good"><div class="metric-top"><span class="tag teal">S5 · 기본 모드</span><span class="label">이벤트 ID 기반 멱등 처리</span></div><div class="metric">0<span>개</span></div><h3>중복 그룹 (DUP1)</h3><div class="bar-track"><div class="bar zero"></div></div><div class="metric-meta"><span>입력 <strong>20건</strong></span><span>전송 시도 <strong>40회</strong></span><span>수신 이벤트 <strong>20건</strong></span></div></div><div class="panel metric-card bad"><div class="metric-top"><span class="tag amber">S12 · 비교 모드</span><span class="label">멱등 방어 없이 반영</span></div><div class="metric">20<span>개</span></div><h3>중복 그룹 (DUP1)</h3><div class="bar-track"><div class="bar" style="width:100%"></div></div><div class="metric-meta"><span>입력 <strong>20건</strong></span><span>전송 시도 <strong>40회</strong></span><span>중복 반영 <strong>발생</strong></span></div></div></div>
+<div class="source">DUP1 = 중복된 (event_id, ecu_id, dtc_code) 그룹 수. 전체 품질 건수나 요청 횟수가 아닙니다.<br>출처: docs/results.md · 2026-11-07 기존 실행 기록 · 가상 데이터와 정의된 장애 시나리오 범위의 결과</div>
+<div class="footer"><span>VEHICLE DIAGNOSTIC GATEWAY</span><span>JUnit 5 · Testcontainers · PostgreSQL 16</span></div>
+</section>
+
+<section class="canvas" id="project-overview">
+<div class="header"><div class="eyebrow">VEHICLE DIAGNOSTIC GATEWAY</div><h1>차량의 진단 데이터를 품질 관리 업무로 연결합니다</h1><p>진단 결과 수집부터 차량 이력 관리, 품질 시스템 전달까지 구현한 백엔드 프로젝트</p></div>
+<div class="journey">
+<div class="panel"><span class="tag">01 · 진단 결과 수집</span><h2>무엇을 받나요?</h2><p>차량 식별 정보와<br>ECU별 진단 결과를 받습니다.</p><div class="sample">차량 식별번호 · 진단 시각<br>ECU 정보 · SW 버전 · 고장코드</div></div>
+<div class="arrow">→</div>
+<div class="panel"><span class="tag">02 · 진단 게이트웨이</span><h2>무엇을 관리하나요?</h2><p>브랜드별 규칙을 확인하고<br>차량의 진단 기록을 쌓습니다.</p><div class="sample">진단 이력 보존 · ECU별 최신 상태<br>중복 수신 처리 · 전송 현황 관리</div></div>
+<div class="arrow">→</div>
+<div class="panel"><span class="tag teal">03 · 품질 시스템 연계</span><h2>어디에 연결하나요?</h2><p>ECU·고장코드 정보를<br>품질 건으로 반영합니다.</p><div class="sample">가상 품질 시스템에 전달<br>중복 반영 방지 · 실패 건 재처리</div></div>
+</div>
+<div class="bottom-note"><strong>구현 범위</strong><span>가상 진단 데이터 → 진단 게이트웨이 → 독립된 가상 품질 시스템</span></div>
+<div class="footer"><span>PROJECT OVERVIEW</span><span>진단 결과 수집 · 이력 관리 · 외부 시스템 연계</span></div>
+</section>
+<section class="canvas" id="project-features">
+<div class="header"><div class="eyebrow">PROJECT FEATURES</div><h1>수집한 진단 결과를 관리하고, 전달하고, 다시 처리합니다</h1><p>진단 데이터와 시스템 연계에 필요한 기능을 두 개의 독립된 서버로 구현했습니다.</p></div>
+<div class="feature-grid">
+<div class="panel feature"><div class="feature-index">01 / COLLECT</div><h2>진단 결과 수집</h2><p>차량·ECU·고장코드 저장<br>같은 진단 결과의 재수신 처리</p></div>
+<div class="panel feature"><div class="feature-index">02 / VALIDATE</div><h2>브랜드별 검증</h2><p>공통 검증과 브랜드 정책 분리<br>SW 버전 등 필수 항목 확인</p></div>
+<div class="panel feature"><div class="feature-index">03 / HISTORY</div><h2>차량 이력 관리</h2><p>진단 당시의 관측 정보 보존<br>ECU별 최신 상태 관리</p></div>
+<div class="panel feature"><div class="feature-index">04 / CONNECT</div><h2>품질 시스템 전달</h2><p>ECU·고장코드를 품질 건에 반영<br>반복 전송의 중복 반영 방지</p></div>
+<div class="panel feature"><div class="feature-index">05 / TRACK</div><h2>연계 현황 조회</h2><p>전송 상태·실패 원인 확인<br>전송 시도별 처리 이력 조회</p></div>
+<div class="panel feature"><div class="feature-index">06 / RECOVER</div><h2>실패 건 재처리</h2><p>일시적 장애 시 자동 재시도<br>사유를 남기는 수동 재처리</p></div>
+</div>
+<div class="footer"><span>VEHICLE DIAGNOSTIC GATEWAY</span><span>Gateway · Receiver</span></div>
+</section>
+<script>
+const names=['project-overview','project-features','architecture','acceptance','response-loss','recovery','comparison'];
+const selected=new URLSearchParams(location.search).get('diagram') || names[0];
+document.getElementById(names.includes(selected)?selected:names[0]).classList.add('active');
+</script>
+</body>
+</html>

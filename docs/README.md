@@ -9,6 +9,7 @@
 ```text
 docs/
 ├── README.md                      # 📌 (본 문서) 문서 전체 목차 및 네비게이션
+├── getting-started.md             # 개발 환경·로컬 실행·빌드 및 검증 가이드
 ├── results.md                     # 장애 시나리오 실제 실행 결과
 │
 ├── architecture/                  # 🏛️ 시스템 아키텍처 및 모듈 명세
@@ -44,6 +45,11 @@ docs/
 ---
 
 ## 📑 주요 문서 바로가기
+
+- [프로젝트 소개](../README.md)
+- [구현 상세와 검증 요약](architecture/implementation-notes.md)
+- [개발 환경 및 실행 가이드](getting-started.md): 기존 README의 기술 구성·설정·실행·검증 안내
+- [README 도식 원본 HTML](assets/readme/diagrams.html): 구조·상태·응답 유실·복구·검증 비교 이미지
 
 ### 1. 시스템 아키텍처 ([`architecture/`](architecture/))
 - [**시스템 아키텍처 개요 (`architecture/overview.md`)**](architecture/overview.md)  
