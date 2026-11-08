@@ -11,23 +11,17 @@ HTML을 브라우저에서 열고 URL 끝에 다음 쿼리를 붙이면 해당 �
 
 | PNG | URL 쿼리 | CSS 크기 |
 | --- | --- | --- |
-| `product-hero.png` | `?diagram=product-hero` | 1120 × 610 |
-| `product-console.png` | `?diagram=product-console` | 1120 × 703 |
-| `product-proof.png` | `?diagram=product-proof` | 1120 × 642 |
-| `project-features.png` | `?diagram=project-features` | 1120 × 649 |
 | `architecture.png` | `?diagram=architecture` | 1120 × 715 |
 | `acceptance.png` | `?diagram=acceptance` | 1120 × 557 |
 | `response-loss.png` | `?diagram=response-loss` | 1120 × 715 |
 | `recovery.png` | `?diagram=recovery` | 1120 × 673 |
 | `comparison.png` | `?diagram=comparison` | 1120 × 623 |
 
-현재 루트 README는 `lot-trace-reverse.png`, `lot-trace-forward.png`, `product-console.png`, `product-proof.png`를 표시합니다. 나머지 도식은 구현 상세 문서에서 사용합니다.
+현재 루트 README는 `lot-trace-reverse.png`, `lot-trace-forward.png`를 표시합니다. 위 표의 도식은 구현 상세 문서에서 사용합니다.
+`diagrams.html`의 `product-*`·`project-features` 섹션은 예전 README용으로 남아 있으며 PNG로 내보내지 않습니다.
 
 `lot-trace-*.png`는 diagrams.html이 아니라 [front_v2](../../../front_v2/README.md) 데모 화면을 Chrome에서 실행 후 단계별 섹션(2·3 역추적, 4 순추적)만 잘라 캡처한 것입니다. 수치는 캡처 당시 무작위 실행 결과입니다.
 
-`product-*` 도식은 [screens/](screens/)의 콘솔 화면 캡처(1440×900 화면, PNG 2880×1800)를 잘라 씁니다.
-콘솔 화면을 다시 캡처하면 `diagrams.html`의 `.shot` 위치·배율을 확인합니다.
-`product-hero`·`product-proof`의 수치는 [검증 결과](../../results.md)의 실제 프로세스 재현 기록을 인용합니다.
 
 ## 수정 및 다시 캡처
 
