@@ -31,7 +31,7 @@ public abstract class ReceiverDatabaseITSupport {
     @BeforeEach
     void reset() {
         faultState.set(new FaultConfig(FaultMode.NONE, FaultConfig.DEFAULT_HOLD_MS));
-        jdbc.execute("TRUNCATE quality_case, quality_case_naive, received_event RESTART IDENTITY CASCADE");
+        jdbc.execute("TRUNCATE received_campaign_vehicle, received_campaign, quality_case, quality_case_naive, received_event RESTART IDENTITY CASCADE");
     }
     protected int count(String table) {
         checkTable(table);
@@ -43,7 +43,7 @@ public abstract class ReceiverDatabaseITSupport {
                 + " GROUP BY event_id, ecu_id, dtc_code HAVING count(*) >= 2) g", Integer.class);
     }
     private void checkTable(String table) {
-        if (!Set.of("received_event", "quality_case", "quality_case_naive").contains(table)) {
+        if (!Set.of("received_event", "quality_case", "quality_case_naive", "received_campaign", "received_campaign_vehicle").contains(table)) {
             throw new IllegalArgumentException("Unknown test table");
         }
     }
@@ -55,6 +55,8 @@ public abstract class ReceiverDatabaseITSupport {
         return http.exchange(path, HttpMethod.POST, new HttpEntity<>(body, headers), JsonNode.class);
     }
     protected void assertEmpty() {
+        org.assertj.core.api.Assertions.assertThat(count("received_campaign")).isZero();
+        org.assertj.core.api.Assertions.assertThat(count("received_campaign_vehicle")).isZero();
         org.assertj.core.api.Assertions.assertThat(count("received_event")).isZero();
         org.assertj.core.api.Assertions.assertThat(count("quality_case")).isZero();
         org.assertj.core.api.Assertions.assertThat(count("quality_case_naive")).isZero();

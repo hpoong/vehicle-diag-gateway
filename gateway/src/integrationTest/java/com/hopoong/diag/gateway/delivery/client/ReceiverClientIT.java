@@ -21,7 +21,7 @@ class ReceiverClientIT {
             String payload = " {\"eventId\":\"" + event + "\",\"message\":\"한글\"} ";
             for (int status : new int[]{200,409,503,302}) {
                 stub.reset(); stub.respond(status);
-                var result = client.send(event, token, payload);
+                var result = client.send("DIAGNOSTIC_RESULT", event, token, payload);
                 assertThat(result.httpStatus()).isEqualTo(status);
                 assertThat(result.error()).isNull();
                 assertThat(stub.requests()).hasSize(1);
@@ -39,15 +39,15 @@ class ReceiverClientIT {
         var classifier = new OutcomeClassifier();
         try (var stub = new StubReceiver()) {
             stub.hold(Duration.ofSeconds(3));
-            var result = client(stub.url()).send("event", "token", "{}");
+            var result = client(stub.url()).send("DIAGNOSTIC_RESULT", "event", "token", "{}");
             assertThat(classifier.classify(result).errorCode()).isEqualTo("READ_TIMEOUT");
             assertThat(result.latencyMs()).isLessThan(3000);
             assertThat(stub.requests()).hasSize(1);
         }
-        assertThat(classifier.classify(client("http://127.0.0.1:" + StubReceiver.unusedPort()).send("e","t","{}")).errorCode())
+        assertThat(classifier.classify(client("http://127.0.0.1:" + StubReceiver.unusedPort()).send("DIAGNOSTIC_RESULT", "e","t","{}")).errorCode())
                 .isEqualTo("CONNECT_FAILED");
         try (var closed = StubReceiver.closeWithoutResponse()) {
-            assertThat(classifier.classify(client(closed.url()).send("e","t","{}")).errorCode()).isEqualTo("CONNECTION_CLOSED");
+            assertThat(classifier.classify(client(closed.url()).send("DIAGNOSTIC_RESULT", "e","t","{}")).errorCode()).isEqualTo("CONNECTION_CLOSED");
         }
     }
 }

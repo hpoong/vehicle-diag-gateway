@@ -102,7 +102,7 @@ class DeliveryFlowIT extends DeliveryDatabaseITSupport {
         assertThat(outcomes()).containsExactly("STARTED"); assertThat(STUB.requests()).isEmpty();
     }
     @Test void recoversAfterHttpCompletedWithoutRecording() {
-        var event=claimOne(); assertThat(client.send(event.eventId(), event.claimToken(), event.payload()).httpStatus()).isEqualTo(200);
+        var event=claimOne(); assertThat(client.send("DIAGNOSTIC_RESULT", event.eventId(), event.claimToken(), event.payload()).httpStatus()).isEqualTo(200);
         expire(); assertThat(service.runOnce().sent()).isEqualTo(1);
         assertThat(STUB.requests()).hasSize(2).extracting(StubReceiver.Request::eventId).containsOnly(event.eventId());
         assertThat(outcomes()).containsExactly("ABANDONED", "SUCCESS");

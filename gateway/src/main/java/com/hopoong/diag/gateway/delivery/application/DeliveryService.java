@@ -40,7 +40,7 @@ public class DeliveryService {
 
     private RecordResult deliver(ClaimedEvent event) {
         try (var ignored = DeliveryMdc.open(event)) {
-            var outcome = classifier.classify(client.send(event.eventId(), event.claimToken(), event.payload()));
+            var outcome = classifier.classify(client.send(event.eventType(), event.eventId(), event.claimToken(), event.payload()));
             var result = recorder.record(event, outcome);
             String next = result.state() == RecordResult.State.RETRY
                     ? "PENDING+" + result.nextDelay().toMillis() + "ms" : result.state().name();

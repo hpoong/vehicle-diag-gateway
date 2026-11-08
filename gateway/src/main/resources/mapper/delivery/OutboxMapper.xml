@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.hopoong.diag.gateway.delivery.persistence.OutboxMapper">
+    <insert id="insertCampaign">
+        INSERT INTO outbox_event(event_type,event_id,campaign_id,payload)
+        VALUES ('CAMPAIGN',#{eventId}::uuid,#{campaignId},#{payload}::jsonb)
+    </insert>
     <insert id="insert">
-        INSERT INTO outbox_event (event_id, result_id, payload)
-        VALUES (#{eventId}::uuid, #{resultId}, #{payload}::jsonb)
+        INSERT INTO outbox_event (event_type, event_id, result_id, payload)
+        VALUES ('DIAGNOSTIC_RESULT', #{eventId}::uuid, #{resultId}, #{payload}::jsonb)
     </insert>
     <resultMap id="delivery" type="com.hopoong.diag.gateway.delivery.persistence.OutboxMapper$DeliveryRow">
         <constructor>
@@ -22,6 +26,7 @@
         <constructor>
             <arg column="id" javaType="_long"/>
             <arg column="event_id" javaType="java.lang.String"/>
+            <arg column="event_type" javaType="java.lang.String"/>
             <arg column="payload" javaType="java.lang.String"/>
             <arg column="attempt_count" javaType="_int"/>
             <arg column="cycle_no" javaType="_int"/>
@@ -40,7 +45,7 @@
             locked_until = now() + #{leaseMillis} * INTERVAL '1 millisecond',
             attempt_count = o.attempt_count + 1, updated_at = now()
         FROM picked p WHERE o.id = p.id
-        RETURNING o.id, o.event_id::text, o.payload::text, o.attempt_count, o.cycle_no, o.claim_token::text
+        RETURNING o.id, o.event_id::text, o.event_type, o.payload::text, o.attempt_count, o.cycle_no, o.claim_token::text
     </select>
     <sql id="currentClaim">
         id = #{id} AND claim_token = #{claimToken}::uuid AND status = 'PENDING'

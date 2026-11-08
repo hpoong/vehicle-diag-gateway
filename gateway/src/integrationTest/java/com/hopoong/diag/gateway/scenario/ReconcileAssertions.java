@@ -23,29 +23,31 @@ public final class ReconcileAssertions {
     }
     public ReconcileReport check(Mode mode, Set<String> allowedDeadEventIds) {
         int results = count("SELECT count(*) FROM diagnostic_result");
+        int diagnosticOutbox = count("SELECT count(*) FROM outbox_event WHERE event_type='DIAGNOSTIC_RESULT'");
+        int diagnosticPending = count("SELECT count(*) FROM outbox_event WHERE status='PENDING' AND event_type='DIAGNOSTIC_RESULT'");
         int outbox = count("SELECT count(*) FROM outbox_event");
         int pending = count("SELECT count(*) FROM outbox_event WHERE status='PENDING'");
         int sent = count("SELECT count(*) FROM outbox_event WHERE status='SENT'");
         int dead = count("SELECT count(*) FROM outbox_event WHERE status='DEAD'");
         var receivedIds = ids(receiver, "SELECT event_id::text FROM received_event");
-        var sentIds = ids(gateway, "SELECT event_id::text FROM outbox_event WHERE status='SENT'");
-        var deadIds = ids(gateway, "SELECT event_id::text FROM outbox_event WHERE status='DEAD'");
+        var sentIds = ids(gateway, "SELECT event_id::text FROM outbox_event WHERE status='SENT' AND event_type='DIAGNOSTIC_RESULT'");
+        var deadIds = ids(gateway, "SELECT event_id::text FROM outbox_event WHERE status='DEAD' AND event_type='DIAGNOSTIC_RESULT'");
         var v = new TreeMap<String, ReconcileReport.Verdict>();
-        verdict(v, "I1", results == outbox, "results=" + results + " outbox=" + outbox);
+        verdict(v, "I1", results == diagnosticOutbox, "results=" + results + " diagnosticOutbox=" + diagnosticOutbox);
         verdict(v, "I2", pending + sent + dead == outbox, "status total=" + (pending + sent + dead));
         if (mode == Mode.NAIVE) {
             for (String id : List.of("I3", "I4", "I5")) v.put(id, new ReconcileReport.Verdict(SKIP, "NAIVE"));
         } else {
             var missing = minus(sentIds, receivedIds);
             verdict(v, "I3", missing.isEmpty(), detail(missing));
-            if (pending > 0) v.put("I4", new ReconcileReport.Verdict(SKIP, "PENDING=" + pending));
+            if (diagnosticPending > 0) v.put("I4", new ReconcileReport.Verdict(SKIP, "PENDING=" + diagnosticPending));
             else {
                 deadIds.retainAll(allowedDeadEventIds);
                 var unexpected = minus(minus(receivedIds, sentIds), deadIds);
                 verdict(v, "I4", missing.isEmpty() && unexpected.isEmpty(), "missing " + detail(missing) + " unexpected " + detail(unexpected));
             }
             var pairs = new HashMap<String, Long>();
-            gateway.query("SELECT ob.event_id::text, coalesce(sum(cardinality(o.dtc_codes)),0) AS pairs FROM outbox_event ob LEFT JOIN ecu_observation o ON o.result_id=ob.result_id GROUP BY ob.event_id",
+            gateway.query("SELECT ob.event_id::text, coalesce(sum(cardinality(o.dtc_codes)),0) AS pairs FROM outbox_event ob LEFT JOIN ecu_observation o ON o.result_id=ob.result_id WHERE ob.event_type='DIAGNOSTIC_RESULT' GROUP BY ob.event_id",
                     rs -> { pairs.put(rs.getString(1), rs.getLong(2)); });
             var mismatches = new TreeSet<String>();
             receiver.query("SELECT r.event_id::text, r.case_count, count(c.id) FROM received_event r LEFT JOIN quality_case c ON c.event_id=r.event_id GROUP BY r.event_id, r.case_count", rs -> {

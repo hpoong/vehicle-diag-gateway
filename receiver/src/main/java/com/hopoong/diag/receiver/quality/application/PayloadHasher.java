@@ -19,7 +19,7 @@ public class PayloadHasher {
             .serializationInclusion(JsonInclude.Include.NON_NULL)
             .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
 
-    String canonicalJson(QualityEventRequest request) {
+    String canonicalJson(Object request) {
         Map<String, Object> tree = HASH_MAPPER.convertValue(request, new TypeReference<>() {});
         try {
             return HASH_MAPPER.writeValueAsString(tree);
@@ -28,7 +28,9 @@ public class PayloadHasher {
         }
     }
 
-    public String hash(QualityEventRequest request) {
+    public String hash(QualityEventRequest request) { return digest(request); }
+    public String hash(com.hopoong.diag.receiver.campaign.web.CampaignTargetRequest request) { return digest(request); }
+    private String digest(Object request) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(canonicalJson(request).getBytes(StandardCharsets.UTF_8)));

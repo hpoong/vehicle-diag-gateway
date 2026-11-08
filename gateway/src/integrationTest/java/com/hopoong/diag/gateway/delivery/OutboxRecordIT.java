@@ -56,7 +56,7 @@ class OutboxRecordIT extends DeliveryDatabaseITSupport {
     }
     @Test void unknownTokenIsStaleAndLeaseExpiryAloneDoesNotInvalidateOwner() {
         var e = claimOne();
-        var wrong = new ClaimedEvent(e.id(), e.eventId(), e.payload(), e.attemptCount(), e.cycleNo(), UUID.randomUUID().toString());
+        var wrong = new ClaimedEvent(e.id(), e.eventId(), e.eventType(), e.payload(), e.attemptCount(), e.cycleNo(), UUID.randomUUID().toString());
         assertThat(recorder.record(wrong, outcome(AttemptOutcome.SUCCESS)).state()).isEqualTo(RecordResult.State.STALE);
         assertThat(text("claim_token::text")).isEqualTo(e.claimToken());
         assertThat(outcomes()).containsExactly("STARTED");

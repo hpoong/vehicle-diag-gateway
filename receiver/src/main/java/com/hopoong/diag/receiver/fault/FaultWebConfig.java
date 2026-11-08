@@ -14,6 +14,6 @@ public class FaultWebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new FaultInterceptor(state)).addPathPatterns("/api/v1/quality-events");
+        registry.addInterceptor(new FaultInterceptor(state)).addPathPatterns("/api/v1/quality-events", "/api/v1/campaign-targets");
     }
 }

@@ -57,14 +57,14 @@ class DeliveryScenarioIT extends ScenarioITSupport {
     }
     @Test void s09_lateSuccessCannotOverwriteNewOwner() {
         fixture.createPending(1); var t1=claimer.claim(1).get(0);
-        var r1=client.send(t1.eventId(),t1.claimToken(),t1.payload());
+        var r1=client.send("DIAGNOSTIC_RESULT", t1.eventId(),t1.claimToken(),t1.payload());
         assertThat(receiver().jdbc().queryForObject("SELECT count(*) FROM received_event",Integer.class)).isEqualTo(1);
         expireLeases(); var t2=claimer.claim(1).get(0);
         assertThat(recorder.record(t1,classifier.classify(r1)).state()).isEqualTo(RecordResult.State.STALE);
         assertThat(gatewayJdbc.queryForObject("SELECT status FROM outbox_event",String.class)).isEqualTo("PENDING");
         assertThat(gatewayJdbc.queryForObject("SELECT claim_token::text FROM outbox_event",String.class)).isEqualTo(t2.claimToken());
         assertThat(gatewayJdbc.queryForObject("SELECT late_outcome FROM delivery_attempt WHERE claim_token=?::uuid",String.class,t1.claimToken())).isEqualTo("SUCCESS");
-        assertThat(recorder.record(t2,classifier.classify(client.send(t2.eventId(),t2.claimToken(),t2.payload()))).state()).isEqualTo(RecordResult.State.SENT);
+        assertThat(recorder.record(t2,classifier.classify(client.send("DIAGNOSTIC_RESULT", t2.eventId(),t2.claimToken(),t2.payload()))).state()).isEqualTo(RecordResult.State.SENT);
         assertThat(gatewayJdbc.queryForList("SELECT outcome FROM delivery_attempt ORDER BY id",String.class)).containsExactly("ABANDONED","SUCCESS");
         assertStandard("S9",1);
     }

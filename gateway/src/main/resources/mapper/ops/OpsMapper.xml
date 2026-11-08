@@ -19,7 +19,9 @@
         <constructor>
             <arg column="id" javaType="_long"/>
             <arg column="event_id" javaType="java.lang.String"/>
-            <arg column="result_id" javaType="_long"/>
+            <arg column="result_id" javaType="java.lang.Long"/>
+            <arg column="event_type" javaType="java.lang.String"/>
+            <arg column="campaign_id" javaType="java.lang.Long"/>
             <arg column="status" javaType="java.lang.String"/>
             <arg column="attempt_count" javaType="_int"/>
             <arg column="cycle_no" javaType="_int"/>
@@ -69,7 +71,7 @@
         FROM outbox_event
     </select>
     <sql id="eventColumns">
-        id, event_id::text, result_id, status, attempt_count, cycle_no, next_attempt_at, locked_by,
+        id, event_id::text, result_id, event_type, campaign_id, status, attempt_count, cycle_no, next_attempt_at, locked_by,
         locked_until, last_outcome, last_http_status, last_error, dead_reason, created_at, updated_at, sent_at, dead_at
     </sql>
     <select id="findEvents" resultMap="eventRow">

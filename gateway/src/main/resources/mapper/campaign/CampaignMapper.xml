@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hopoong.diag.gateway.campaign.persistence.CampaignMapper">
+<resultMap id="existing" type="com.hopoong.diag.gateway.campaign.persistence.ExistingCampaign"><constructor>
+    <arg column="id" javaType="_long"/>
+    <arg column="request_hash" javaType="java.lang.String"/>
+    <arg column="target_count" javaType="_int"/>
+    <arg column="event_id" javaType="java.lang.String"/>
+    <arg column="delivery_status" javaType="java.lang.String"/>
+</constructor></resultMap>
+<resultMap id="inserted" type="com.hopoong.diag.gateway.campaign.persistence.InsertedCampaign"><constructor>
+    <arg column="id" javaType="_long"/>
+    <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+</constructor></resultMap>
+<resultMap id="snapshotVehicle" type="com.hopoong.diag.gateway.campaign.persistence.SnapshotVehicle"><constructor>
+    <arg column="vin" javaType="java.lang.String"/>
+    <arg column="serial_no" javaType="java.lang.String"/>
+</constructor></resultMap>
+<resultMap id="detail" type="com.hopoong.diag.gateway.campaign.persistence.CampaignDetailRow"><constructor>
+    <arg column="id" javaType="_long"/>
+    <arg column="request_id" javaType="java.lang.String"/>
+    <arg column="ecu_id" javaType="java.lang.String"/>
+    <arg column="lot_no" javaType="java.lang.String"/>
+    <arg column="dtc_code" javaType="java.lang.String"/>
+    <arg column="reason" javaType="java.lang.String"/>
+    <arg column="requested_by" javaType="java.lang.String"/>
+    <arg column="target_count" javaType="_int"/>
+    <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    <arg column="outbox_id" javaType="_long"/>
+    <arg column="event_id" javaType="java.lang.String"/>
+    <arg column="status" javaType="java.lang.String"/>
+    <arg column="attempt_count" javaType="_int"/>
+    <arg column="cycle_no" javaType="_int"/>
+    <arg column="last_outcome" javaType="java.lang.String"/>
+    <arg column="last_http_status" javaType="java.lang.Integer"/>
+    <arg column="next_attempt_at" javaType="java.time.OffsetDateTime"/>
+    <arg column="sent_at" javaType="java.time.OffsetDateTime"/>
+    <arg column="dead_reason" javaType="java.lang.String"/>
+</constructor></resultMap>
+<select id="findByRequestId" resultMap="existing">            <!-- ExistingCampaign(long id, String requestHash, int targetCount, String eventId, String deliveryStatus) -->
+    SELECT c.id, c.request_hash, c.target_count, o.event_id::text AS event_id, o.status AS delivery_status
+      FROM campaign c LEFT JOIN outbox_event o ON o.campaign_id = c.id
+     WHERE c.request_id = #{requestId}
+</select>
+<select id="insertCampaign" resultMap="inserted" affectData="true" flushCache="true">   <!-- InsertedCampaign(long id, OffsetDateTime createdAt) -->
+    INSERT INTO campaign (request_id, request_hash, ecu_id, lot_no, dtc_code, reason, requested_by, target_count)
+    VALUES (#{cmd.requestId}, #{hash}, #{cmd.ecuId}, #{cmd.lotNo}, #{cmd.dtcCode}, #{cmd.reason}, #{cmd.requestedBy}, #{targetCount})
+    ON CONFLICT (request_id) DO NOTHING
+    RETURNING id, created_at
+</select>
+<select id="insertSnapshot" resultMap="snapshotVehicle" affectData="true" flushCache="true">  <!-- SnapshotVehicle(String vin, String serialNo) -->
+    INSERT INTO campaign_vehicle (campaign_id, vin, serial_no)
+    SELECT #{campaignId}, p.vin, p.serial_no
+      FROM vehicle_part p
+     WHERE <include refid="com.hopoong.diag.gateway.trace.persistence.TraceMapper.currentLotVehicles"/>
+    RETURNING vin, serial_no
+</select>
+<select id="findCampaign" resultMap="detail">
+ SELECT c.id,c.request_id,c.ecu_id,c.lot_no,c.dtc_code,c.reason,c.requested_by,c.target_count,c.created_at,
+        o.id AS outbox_id,o.event_id::text,o.status,o.attempt_count,o.cycle_no,o.last_outcome,o.last_http_status,o.next_attempt_at,o.sent_at,o.dead_reason
+ FROM campaign c JOIN outbox_event o ON o.campaign_id=c.id WHERE c.id=#{id}
+</select>
+<select id="findVehicles" resultMap="snapshotVehicle">SELECT vin,serial_no FROM campaign_vehicle WHERE campaign_id=#{id} ORDER BY vin</select>
+</mapper>

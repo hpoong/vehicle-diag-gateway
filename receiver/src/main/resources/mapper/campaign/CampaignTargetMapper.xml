@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hopoong.diag.receiver.campaign.persistence.CampaignTargetMapper">
+<resultMap id="received" type="com.hopoong.diag.receiver.campaign.persistence.ReceivedCampaignRow"><constructor>
+<arg column="payload_hash" javaType="java.lang.String"/><arg column="vehicle_count" javaType="_int"/>
+</constructor></resultMap>
+<select id="insertReceived" resultType="string" affectData="true" flushCache="true">
+    INSERT INTO received_campaign (event_id, payload_hash, campaign_id, ecu_id, lot_no, vehicle_count)
+    VALUES (#{eventId}::uuid, #{payloadHash}, #{campaignId}, #{ecuId}, #{lotNo}, #{vehicleCount})
+    ON CONFLICT (event_id) DO NOTHING RETURNING event_id::text
+</select>
+<select id="findReceived" resultMap="received">
+    SELECT payload_hash, vehicle_count FROM received_campaign WHERE event_id = #{eventId}::uuid
+</select>
+<insert id="insertVehicles">
+    INSERT INTO received_campaign_vehicle (event_id, vin, serial_no) VALUES
+    <foreach collection="vehicles" item="v" separator=",">(#{eventId}::uuid, #{v.vin}, #{v.serialNo})</foreach>
+</insert>
+</mapper>

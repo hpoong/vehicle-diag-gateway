@@ -13,7 +13,7 @@ class ReceiverClientTest {
                 new DeliveryProperties.Backoff(Duration.ZERO, 2, Duration.ofMinutes(5)), "http://localhost:1", "test");
         var client = new ReceiverClient(p);
         TransactionSynchronizationManager.setActualTransactionActive(true);
-        try { assertThatThrownBy(() -> client.send("id", "token", "{} ")).isInstanceOf(IllegalStateException.class); }
+        try { assertThatThrownBy(() -> client.send("DIAGNOSTIC_RESULT", "id", "token", "{} ")).isInstanceOf(IllegalStateException.class); }
         finally { TransactionSynchronizationManager.setActualTransactionActive(false); }
     }
 }

@@ -9,7 +9,7 @@ class DeliveryMdcTest {
     @Test void scopesIdentifiersAndRestoresCallerContextOnFailure() {
         MDC.put("requestId", "caller");
         try {
-            try (var ignored = DeliveryMdc.open(new ClaimedEvent(1,"event","{}",2,1,"token"))) {
+            try (var ignored = DeliveryMdc.open(new ClaimedEvent(1,"event","DIAGNOSTIC_RESULT","{}",2,1,"token"))) {
                 assertThat(MDC.get("claimToken")).isEqualTo("token");
                 assertThat(MDC.get("attemptNo")).isEqualTo("2");
             }

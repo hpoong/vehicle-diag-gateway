@@ -33,6 +33,6 @@ public final class OutboxFixture {
                 reason, attemptCount, "MAX_ATTEMPTS".equals(reason) ? "RETRYABLE" : "NON_RETRYABLE", id);
     }
     public void reset() {
-        jdbc.execute("TRUNCATE ops_action_log, delivery_attempt, outbox_event, vehicle_part, vehicle_ecu_latest, ecu_observation, diagnostic_result RESTART IDENTITY CASCADE");
+        jdbc.execute("TRUNCATE ops_action_log, delivery_attempt, outbox_event, campaign_vehicle, campaign, vehicle_part, vehicle_ecu_latest, ecu_observation, diagnostic_result RESTART IDENTITY CASCADE");
     }
 }

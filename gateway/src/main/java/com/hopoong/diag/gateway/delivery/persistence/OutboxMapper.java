@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface OutboxMapper {
+    void insertCampaign(@Param("campaignId") long campaignId,@Param("eventId") String eventId,@Param("payload") String payload);
     void insert(@Param("resultId") long resultId, @Param("eventId") String eventId, @Param("payload") String payload);
     Optional<DeliveryRow> findByResultId(@Param("resultId") long resultId);
     java.util.List<ClaimedEvent> claim(@Param("limit") int limit, @Param("instanceId") String instanceId,
