@@ -55,7 +55,7 @@
         <label class="check"><input type="checkbox" name="noise" checked>
           <span>현실 데이터처럼 섞기 <small>LOT 기록 누락·부품 교체 차량 일부 포함</small></span></label>
         <label class="check"><input type="checkbox" name="reset" checked>
-          <span>DB 비우고 시작 <small>끄면 이전 데이터가 남아 숨겨 둔 정답과 숫자가 어긋날 수 있습니다</small></span></label>
+          <span>DB 비우고 시작 <small>끄면 이전 데이터가 남아 기대값과 숫자가 어긋날 수 있습니다</small></span></label>
         <button class="btn primary" type="submit" id="btnRun">데이터 보내기</button>
       </form>
       <p class="note">정상 LOT가 달린 차도 2% 정도는 같은 고장이 납니다. 차량은 <span class="term" data-t="diag">진단 결과</span>를 2번씩 보내고,
@@ -68,7 +68,7 @@
   <section class="step" id="step2" hidden>
     <div class="step-n">2</div>
     <div class="step-body">
-      <h2>데이터가 들어왔습니다</h2>
+      <h2>데이터가 들어옵니다</h2>
       <div class="flow" aria-label="데이터 흐름">
         <div class="node src"><span class="who">공장 생산 시스템</span>
           <div class="num"><b id="partRows">-</b><span>건</span></div>
@@ -83,10 +83,9 @@
           <span class="what">진단 결과와 고장코드를 보냄</span></div>
       </div>
       <div class="deliver">
-        <div class="deliver-h"><span>수집 서버 → <span class="term" data-t="receiver">품질 시스템</span> <small>receiver</small> 전달</span>
-          <span id="deliverText">-</span></div>
-        <div class="meter" role="progressbar" aria-label="품질 시스템 전달 진행" id="deliverBar"><span></span></div>
-        <p class="note" id="deliverNote">추적은 수집 서버의 데이터로 바로 할 수 있습니다. 품질 시스템 전달은 뒤에서 따로 진행됩니다.</p>
+        <div class="deliver-h"><span>차량 → <span class="term" data-t="gateway">수집 서버</span> 전송 <small>실제 gateway API</small></span>
+          <span id="sendStatus">-</span></div>
+        <div class="meter" role="progressbar" aria-label="진단 결과 전송 진행" id="sendBar"><span></span></div>
       </div>
     </div>
   </section>
@@ -95,12 +94,13 @@
   <section class="step" id="step3" hidden>
     <div class="step-n">3</div>
     <div class="step-body">
-      <h2>원인 LOT 찾기 <small class="kind"><span class="term" data-t="reverse">역추적</span></small></h2>
+      <h2>원인 LOT 찾기 <small class="kind"><span class="term" data-t="reverse">역추적</span></small> <span class="live" id="liveBadge" hidden>● 쌓이는 DB를 1초마다 조회 중</span></h2>
       <p class="headline" id="headline"></p>
       <figure class="chart">
         <figcaption>LOT별 <span class="term" data-t="rate">고장 비율</span> <span class="muted">고장 차량 ÷ 진단받은 차량 · 막대를 누르면 그 LOT 차량 보기</span></figcaption>
         <div id="bars" class="bars" role="list"></div>
         <div class="tip" id="tip" hidden></div>
+        <p class="note" id="lowNote" hidden></p>
       </figure>
       <button class="btn primary" id="btnToForward" type="button" hidden></button>
 
@@ -117,7 +117,7 @@
       <p class="note">차량 <b>대수</b>로 셉니다. 한 차가 고장코드를 여러 번 보내도 1대입니다.
         그래서 재전송이 섞여도 숫자가 부풀지 않습니다.</p>
       <div class="answer">
-        <button class="btn" id="btnReveal" type="button">숨겨 둔 정답 공개</button>
+        <button class="btn" id="btnReveal" type="button">기대값과 비교</button>
         <div id="answerBody" hidden></div>
       </div>
     </div>
@@ -136,18 +136,6 @@
       </figure>
       <div class="table-wrap"><table id="fwdTable"></table></div>
       <button class="btn ghost" id="btnMore" type="button" hidden>전체 보기</button>
-    </div>
-  </section>
-
-  <!-- 5. 신뢰 -->
-  <section class="step" id="step5" hidden>
-    <div class="step-n">5</div>
-    <div class="step-body">
-      <h2>이 숫자, 믿을 수 있나요?</h2>
-      <p>차량이 통신 문제로 <b>이미 보낸 진단 결과를 전부 한 번 더</b> 보낸다고 해 봅시다.
-        건수를 그냥 더하는 시스템이라면 저장 건수가 두 배가 되고 고장 비율도 흔들립니다.</p>
-      <button class="btn primary" id="btnReplay" type="button">같은 데이터 전부 다시 보내기</button>
-      <div id="replay"></div>
     </div>
   </section>
 

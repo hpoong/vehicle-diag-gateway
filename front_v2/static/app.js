@@ -14,7 +14,7 @@ const time = (v) => {
 const LOTS = ["L-2401", "L-2402", "L-2403", "L-2404", "L-2405", "L-2406"];
 const FIELDS = ["faultVehicles", "diagnosedVehicles", "installedVehicles"];
 
-const state = { run: null, lot: null, fwd: null, showAll: false, db: null, dbTab: "parts", ready: null };
+const state = { run: null, setup: null, trace: null, sending: false, lot: null, fwd: null, showAll: false, db: null, dbTab: "parts", ready: null };
 
 /* ------------------------------------------------------------ 용어 */
 const TERMS = {
@@ -97,63 +97,105 @@ $("#btnPrepare").addEventListener("click", (ev) => busy(ev.target, "켜는 중�
 
 /* ------------------------------------------------------------ 1 → 2 → 3 */
 $("#defectLot").insertAdjacentHTML("beforeend", LOTS.map((l) => `<option>${l}</option>`).join(""));
-$("#setup").addEventListener("submit", (ev) => {
+$("#setup").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const f = ev.target;
   const body = { vehicles: Number(f.vehicles.value), defectLot: f.defectLot.value, severity: f.severity.value, noise: f.noise.checked, reset: f.reset.checked };
-  if (!body.reset && !confirm("DB를 비우지 않고 보냅니다. 이전 데이터가 섞여 정답 비교가 맞지 않을 수 있습니다.")) return;
-  busy($("#btnRun"), "보내는 중…", async () => {
+  if (!body.reset && !confirm("DB를 비우지 않고 보냅니다. 이전 데이터가 섞여 기대값 비교가 맞지 않을 수 있습니다.")) return;
+  const btn = $("#btnRun"); btn.disabled = true; btn.textContent = "보내는 중…";
+  try {
     const r = await api("run", body);
-    state.run = r; state.lot = null; state.fwd = null;
-    $("#step4").hidden = true; $("#replay").innerHTML = "";
-    renderReceived(r); renderTrace(r.trace);
-    $("#answerBody").hidden = true; $("#btnReveal").hidden = false;
-    show("#step2"); show("#step3"); show("#step5"); $("#btnRestart").hidden = false;
+    startLive(r.setup);
     scrollTo("#step2");
-  });
+    poll();
+  } catch (e) { toast(e.message, true); endSending(); }
 });
 
-function renderReceived(r) {
-  const x = r.received;
-  $("#partRows").textContent = fmt(x.partRows);
-  $("#diagSent").textContent = fmt(x.diagSent);
-  $("#diagResent").textContent = fmt(x.diagResent);
-  $("#diagStored").textContent = fmt(x.diagStored);
-  $("#vehiclesN").textContent = fmt(r.setup.vehicles);
+/* 전송은 서버 스레드가 실제 gateway API로 한 건씩 보낸다. 화면은 1초마다 진행 상태와 gateway 역추적 결과를 다시 받는다. */
+function startLive(setup) {
+  state.run = null; state.setup = setup; state.trace = null; state.sending = true; state.lot = null; state.fwd = null;
+  $("#btnRun").disabled = true; $("#btnRun").textContent = "보내는 중…";
+  $("#step4").hidden = true; $("#answerBody").hidden = true; $("#btnReveal").hidden = true; $("#btnToForward").hidden = true;
+  $("#btnRestart").hidden = true; $("#bars").innerHTML = ""; $("#waffles").innerHTML = ""; $("#lotTable").innerHTML = ""; $("#unattributed").innerHTML = "";
+  $("#lowNote").hidden = true;
+  $("#headline").textContent = "생산 이력을 보내는 중입니다…";
+  $("#liveBadge").hidden = false;
+  show("#step2"); show("#step3");
+}
+function endSending() {
+  state.sending = false; $("#liveBadge").hidden = true;
+  const btn = $("#btnRun"); btn.textContent = "데이터 보내기"; btn.disabled = !(state.ready && state.ready.ok);
+}
+async function poll() {
+  let p;
+  try { p = await api("progress"); }
+  catch (e) { toast(e.message, true); setTimeout(poll, 2000); return; }
+  if (p.state === "idle") { endSending(); return; }
+  renderProgress(p);
+  if (p.trace) renderTrace(p.trace, p.state !== "done");
+  if (p.state === "done") {
+    state.run = { setup: p.setup, trace: p.trace, answer: p.answer };
+    endSending(); $("#btnReveal").hidden = false; $("#btnRestart").hidden = false; loadDb();
+    toast(`전송 완료 · ${fmt(p.total)}건, ${p.elapsedSec}초`);
+  } else if (p.state === "error") {
+    endSending(); $("#sendStatus").textContent = "전송 실패: " + (p.error || ""); toast(p.error || "전송 실패", true);
+  } else setTimeout(poll, 1000);
 }
 
-function renderDelivery(db) {
-  if (!state.run || !db) return;
-  const total = db.gateway.results, got = db.receiver.received;
-  const ratio = total ? Math.min(1, got / total) : 0;
-  $("#deliverText").textContent = `품질 시스템이 받은 결과 ${fmt(got)} / ${fmt(total)}건`;
-  const bar = $("#deliverBar"); $("span", bar).style.width = ratio * 100 + "%";
-  bar.classList.toggle("done", total > 0 && got >= total);
-  bar.setAttribute("aria-valuenow", Math.round(ratio * 100));
-  const off = state.ready && state.ready.receiver !== "up" && state.ready.receiver !== "external";
-  $("#deliverNote").textContent = total > 0 && got >= total
-    ? "모든 진단 결과가 품질 시스템까지 전달됐습니다."
-    : off ? "품질 시스템이 꺼져 있어 전달이 멈춰 있습니다. 추적(3·4단계)은 수집 서버 데이터로 계속 됩니다."
-      : db.gateway.dead ? `전달하지 못하고 멈춘 결과가 ${fmt(db.gateway.dead)}건 있습니다. 추적은 수집 서버 데이터로 계속 됩니다.`
-        : "추적은 수집 서버 데이터로 바로 할 수 있습니다. 품질 시스템 전달은 뒤에서 따로 진행됩니다.";
+function renderProgress(p) {
+  $("#partRows").textContent = p.state === "parts" ? "…" : fmt(p.partRows);
+  $("#diagSent").textContent = fmt(p.done);
+  $("#diagResent").textContent = fmt(p.resent);
+  $("#diagStored").textContent = fmt(p.diagStored);
+  $("#vehiclesN").textContent = fmt(p.setup.vehicles);
+  const ratio = p.total ? p.done / p.total : 0;
+  const meter = $("#sendBar"); $("span", meter).style.width = ratio * 100 + "%";
+  meter.classList.toggle("done", p.state === "done"); meter.setAttribute("aria-valuenow", Math.round(ratio * 100));
+  $("#sendStatus").textContent = p.state === "parts" ? "생산 이력을 보내는 중입니다…"
+    : p.state === "done" ? `전송 완료 · 진단 결과 ${fmt(p.total)}건을 ${p.elapsedSec}초 동안 보냈습니다.`
+      : `진단 결과 보내는 중 ${fmt(p.done)} / ${fmt(p.total)}건 · 초당 약 ${fmt(p.setup.ratePerSec)}건${p.resent ? " · 지금은 재전송분" : ""}`;
 }
 
-function topLot(t) { return [...t.lots].sort((a, b) => b.faultRate - a.faultRate)[0]; }
 
-function renderTrace(t) {
+/* 표본이 충분한 LOT 중 고장 비율 1위. 모두 표본 부족이면 없음 */
+function topLot(t) { return [...t.lots].filter((l) => !l.lowSample).sort((a, b) => b.faultRate - a.faultRate)[0]; }
+
+function renderTrace(t, live = false) {
+  state.trace = t;
   const top = topLot(t);
-  if (!top) { $("#headline").textContent = "기간 안에 진단받은 차량이 없습니다."; $("#bars").innerHTML = ""; $("#waffles").innerHTML = ""; return; }
-  const times = top.otherLotsFaultRate > 0 ? Math.round(top.faultRate / top.otherLotsFaultRate) : null;
-  $("#headline").innerHTML = `<b>${esc(top.lotNo)}</b> 부품이 달린 차는 <b>${pct(top.faultRate)}</b>가 고장 났습니다.
-    다른 LOT는 평균 <b>${pct(top.otherLotsFaultRate)}</b>${times && times > 1 ? ` · 약 <b>${times}배</b>` : ""}. 이 LOT가 원인 후보입니다.`;
-  const go = $("#btnToForward"); go.hidden = false; go.dataset.lot = top.lotNo; go.textContent = `${top.lotNo} 장착 차량 찾기 →`;
-
+  const go = $("#btnToForward");
+  go.hidden = live || !top;
   const lots = [...t.lots].sort((a, b) => a.lotNo.localeCompare(b.lotNo));
+  if (!lots.length) {
+    $("#headline").textContent = live ? "진단 결과가 들어오기를 기다리는 중입니다…" : "기간 안에 진단받은 차량이 없습니다.";
+    $("#bars").innerHTML = ""; $("#waffles").innerHTML = ""; $("#lowNote").hidden = true; return;
+  }
+  if (!top) {
+    $("#headline").innerHTML = `아직 LOT마다 진단받은 차가 <b>${fmt(t.minSample)}대</b>가 안 됩니다(표본 부족). 데이터가 더 쌓이면 원인 후보가 드러납니다.`;
+  } else {
+    const times = top.otherLotsFaultRate > 0 ? Math.round(top.faultRate / top.otherLotsFaultRate) : null;
+    $("#headline").innerHTML = `${live ? '<span class="muted">지금까지 쌓인 데이터 기준</span> ' : ""}<b>${esc(top.lotNo)}</b> 부품이 달린 차는 <b>${pct(top.faultRate)}</b>가 고장 났습니다.
+      다른 LOT는 평균 <b>${pct(top.otherLotsFaultRate)}</b>${times && times > 1 ? ` · 약 <b>${times}배</b>` : ""}. ${live ? "현재 1위입니다." : "이 LOT가 원인 후보입니다."}`;
+    go.dataset.lot = top.lotNo; go.textContent = `${top.lotNo} 장착 차량 찾기 →`;
+  }
+
   const max = Math.max(...lots.map((l) => l.faultRate), 0.0001);
-  $("#bars").innerHTML = lots.map((l) => `<div class="bar${l.lotNo === top.lotNo ? " top" : ""}${l.lotNo === state.lot ? " sel" : ""}" role="listitem" tabindex="0" data-lot="${esc(l.lotNo)}">
-      <span class="lot">${esc(l.lotNo)}</span>
-      <span class="track"><span class="fill" style="width:${(l.faultRate / max) * 100}%"></span></span>
-      <span class="val">${pct(l.faultRate)} · ${fmt(l.faultVehicles)}/${fmt(l.diagnosedVehicles)}대</span></div>`).join("");
+  const box = $("#bars");
+  if ($$(".bar", box).map((b) => b.dataset.lot).join() !== lots.map((l) => l.lotNo).join()) {
+    box.innerHTML = lots.map((l) => `<div class="bar" role="listitem" tabindex="0" data-lot="${esc(l.lotNo)}">
+      <span class="lot">${esc(l.lotNo)}</span><span class="track"><span class="fill"></span></span><span class="val"></span></div>`).join("");
+  }
+  for (const l of lots) {  // 막대를 다시 만들지 않고 값만 바꿔 길이 변화가 부드럽게 보이게 한다
+    const b = $(`.bar[data-lot="${CSS.escape(l.lotNo)}"]`, box);
+    b.classList.toggle("top", !!top && l.lotNo === top.lotNo);
+    b.classList.toggle("sel", l.lotNo === state.lot);
+    b.classList.toggle("low", l.lowSample);
+    $(".fill", b).style.width = (l.faultRate / max) * 100 + "%";
+    $(".val", b).textContent = `${pct(l.faultRate)} · ${fmt(l.faultVehicles)}/${fmt(l.diagnosedVehicles)}대`;
+  }
+  $("#lowNote").hidden = !lots.some((l) => l.lowSample);
+  $("#lowNote").textContent = `흐린 막대는 진단받은 차가 ${fmt(t.minSample)}대 미만인 LOT(표본 부족)입니다. 원인 후보에서 뺍니다.`;
+  if (!top) { $("#waffles").innerHTML = ""; return; }
 
   const cells = (n) => Array.from({ length: 100 }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("");
   const a = Math.round(top.faultRate * 100), b = Math.round((top.otherLotsFaultRate || 0) * 100);
@@ -176,9 +218,9 @@ function renderTrace(t) {
 /* 막대 hover 툴팁 + 클릭 → 순추적 */
 const bars = $("#bars"), tip = $("#tip");
 bars.addEventListener("mousemove", (ev) => {
-  const b = ev.target.closest(".bar"); if (!b || !state.run) { tip.hidden = true; return; }
-  const l = state.run.trace.lots.find((x) => x.lotNo === b.dataset.lot);
-  tip.innerHTML = `<b>${esc(l.lotNo)}</b><br>고장 ${fmt(l.faultVehicles)}대 / 진단 ${fmt(l.diagnosedVehicles)}대 (${pct(l.faultRate)})<br>이 LOT가 달린 적 있는 차 ${fmt(l.installedVehicles)}대<br><span class="muted">누르면 그 LOT 차량 보기</span>`;
+  const b = ev.target.closest(".bar"); if (!b || !state.trace) { tip.hidden = true; return; }
+  const l = state.trace.lots.find((x) => x.lotNo === b.dataset.lot); if (!l) return;
+  tip.innerHTML = `<b>${esc(l.lotNo)}</b><br>고장 ${fmt(l.faultVehicles)}대 / 진단 ${fmt(l.diagnosedVehicles)}대 (${pct(l.faultRate)})<br>이 LOT가 달린 적 있는 차 ${fmt(l.installedVehicles)}대<br><span class="muted">${state.sending ? "전송이 끝나면 눌러서 차량 보기" : "누르면 그 LOT 차량 보기"}</span>`;
   const r = $("#bars").parentElement.getBoundingClientRect();
   tip.style.left = Math.max(0, Math.min(ev.clientX - r.left + 14, r.width - 230)) + "px"; tip.style.top = ev.clientY - r.top + 14 + "px"; tip.hidden = false;
 });
@@ -187,22 +229,23 @@ bars.addEventListener("click", (ev) => { const b = ev.target.closest(".bar"); if
 bars.addEventListener("keydown", (ev) => { const b = ev.target.closest(".bar"); if (b && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); openForward(b.dataset.lot); } });
 $("#btnToForward").addEventListener("click", (ev) => openForward(ev.target.dataset.lot));
 
-/* 정답 공개 */
+/* 기대값 비교 */
 $("#btnReveal").addEventListener("click", () => {
   const r = state.run; if (!r) return;
   const top = topLot(r.trace); const exp = Object.fromEntries(r.answer.expected.lots.map((l) => [l.lotNo, l]));
   const same = r.trace.lots.filter((l) => exp[l.lotNo] && FIELDS.every((k) => l[k] === exp[l.lotNo][k])).length;
   const allSame = same === r.answer.expected.lots.length && same === r.trace.lots.length;
   const found = top?.lotNo === r.answer.defectLot;
-  $("#answerBody").innerHTML = `<p class="verdict ${found ? "ok" : "ng"}">숨겨 둔 결함 LOT는 <span class="mono">${esc(r.answer.defectLot)}</span> · 시스템이 찾은 1위 <span class="mono">${esc(top?.lotNo)}</span> ${found ? "✔ 일치" : "✘ 불일치"}</p>
-    <p class="note">시뮬레이터가 보낸 데이터로 따로 계산한 정답과 LOT별 고장·진단·장착 차량 수가 ${allSame ? `<b>${same}개 LOT 모두 같습니다</b> ✔` : `${same}개 LOT만 같습니다 ✘`}.
-    ${!r.setup.reset ? "<b>DB를 비우지 않고 보내</b> 이전 데이터가 함께 집계됐습니다. 정답과 다르면 이 때문입니다."
+  $("#answerBody").innerHTML = `<p class="verdict ${found ? "ok" : "ng"}">기대값(결함을 심어 둔 LOT)은 <span class="mono">${esc(r.answer.defectLot)}</span> · 시스템이 찾은 1위 <span class="mono">${esc(top?.lotNo)}</span> ${found ? "✔ 일치" : "✘ 불일치"}</p>
+    <p class="note">시뮬레이터가 보낸 데이터로 따로 계산한 기대값과 LOT별 고장·진단·장착 차량 수가 ${allSame ? `<b>${same}개 LOT 모두 같습니다</b> ✔` : `${same}개 LOT만 같습니다 ✘`}.
+    ${!r.setup.reset ? "<b>DB를 비우지 않고 보내</b> 이전 데이터가 함께 집계됐습니다. 기대값과 다르면 이 때문입니다."
       : found ? "" : "결함 정도를 ‘약함’으로 두면 정상 LOT의 우연한 고장과 구분이 어려워질 수 있습니다."}</p>`;
   $("#answerBody").hidden = false; $("#btnReveal").hidden = true;
 });
 
 /* ------------------------------------------------------------ 4 순추적 */
 async function openForward(lot) {
+  if (state.sending || !state.run) { toast("전송이 끝난 뒤 볼 수 있습니다"); return; }
   state.lot = lot; state.showAll = false;
   $$(".bar").forEach((b) => b.classList.toggle("sel", b.dataset.lot === lot));
   try {
@@ -217,7 +260,7 @@ function renderForward() {
   const others = f.vehicles.length - faulty;
   const match = expected && expected.currentVehicles === f.currentVehicles && expected.excludedRemoved === f.excludedRemoved;
   $("#fwdHeadline").innerHTML = `지금 <b>${esc(f.lotNo)}</b> 부품이 달려 있는 차는 <b>${fmt(f.currentVehicles)}대</b>입니다. 이 차들이 점검 대상입니다.
-    <span class="note">${f.excludedRemoved ? `이미 다른 부품으로 교체한 ${fmt(f.excludedRemoved)}대는 뺐습니다. ` : ""}${match ? "정답과 일치 ✔" : ""}</span>`;
+    <span class="note">${f.excludedRemoved ? `이미 다른 부품으로 교체한 ${fmt(f.excludedRemoved)}대는 뺐습니다. ` : ""}${match ? "기대값과 일치 ✔" : ""}</span>`;
   const total = Math.max(1, f.vehicles.length);
   $("#split").innerHTML = `<span class="a" style="flex:${faulty}">${faulty ? fmt(faulty) : ""}</span><span class="b" style="flex:${others}">${others ? fmt(others) : ""}</span>`;
   $("#split").setAttribute("aria-label", `점검 대상 ${fmt(f.vehicles.length)}대 중 최근 ${dtc} ${faulty}대`);
@@ -232,19 +275,6 @@ function renderForward() {
   $("#btnMore").textContent = `전체 ${fmt(f.vehicles.length)}대 보기`;
 }
 $("#btnMore").addEventListener("click", () => { state.showAll = true; renderForward(); });
-
-/* ------------------------------------------------------------ 5 재전송 */
-$("#btnReplay").addEventListener("click", (ev) => busy(ev.target, "다시 보내는 중…", async () => {
-  const r = await api("replay", {});
-  const before = state.run.trace.totals.faultVehicles, after = r.trace.totals.faultVehicles;
-  const ok = r.allOk && r.before === r.after && r.traceUnchanged;
-  $("#replay").innerHTML = `<div class="result">
-    <p class="verdict ${ok ? "ok" : "ng"}">${ok ? "✔ 숫자가 그대로입니다" : "✘ 숫자가 바뀌었습니다"}</p>
-    <div class="compare"><span>다시 보낸 진단 결과</span><b>${fmt(r.resent)}</b><span>건</span></div>
-    <div class="compare"><span>저장된 진단 결과</span><b>${fmt(r.before)}</b><span>→</span><b>${fmt(r.after)}</b><span>건</span></div>
-    <div class="compare"><span>고장 차량 수</span><b>${fmt(before)}</b><span>→</span><b>${fmt(after)}</b><span>대 · LOT별 숫자 ${r.traceUnchanged ? "변화 없음" : "변화 있음"}</span></div>
-    <p class="note">같은 진단 결과는 단말 ID와 이벤트 ID로 알아보고 한 번만 저장합니다. 그래서 몇 번을 다시 받아도 원인 LOT와 고장 차량 수가 흔들리지 않습니다.</p></div>`;
-}));
 
 /* ------------------------------------------------------------ DB */
 const DB_TABS = {
@@ -269,7 +299,7 @@ function renderDb() {
       : `<tr><td colspan="${tab.head.length}" class="note">비어 있습니다.</td></tr>`) + "</tbody>";
 }
 async function loadDb() {
-  try { state.db = await api("db"); renderDb(); renderDelivery(state.db); }
+  try { state.db = await api("db"); renderDb(); }
   catch (e) { $("#dbGateway").innerHTML = `<p class="note">DB를 읽을 수 없습니다: ${esc(e.message)}</p>`; $("#dbReceiver").innerHTML = ""; }
 }
 $("#dbTabs").addEventListener("click", (ev) => {
@@ -285,11 +315,13 @@ $("#btnReset").addEventListener("click", (ev) => {
 });
 
 function resetSteps() {
-  for (const id of ["#step2", "#step3", "#step4", "#step5"]) $(id).hidden = true;
-  $("#btnRestart").hidden = true; state.run = null;
+  for (const id of ["#step2", "#step3", "#step4"]) $(id).hidden = true;
+  $("#btnRestart").hidden = true; state.run = null; state.setup = null; state.trace = null;
 }
 $("#btnRestart").addEventListener("click", () => { resetSteps(); window.scrollTo({ top: 0, behavior: "smooth" }); });
 
 refreshStatus(); loadDb();
+/* 전송 중에 새로고침했으면 이어서 보여 준다 */
+api("progress").then((p) => { if (p.state === "parts" || p.state === "diag") { startLive(p.setup); poll(); } }).catch(() => {});
 setInterval(refreshStatus, 4000);
 setInterval(() => { if (!document.hidden) loadDb(); }, 2000);

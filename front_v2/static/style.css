@@ -120,7 +120,10 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 .deliver { margin-top: 14px; }
 .deliver-h { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 14px; color: var(--text-2); margin-bottom: 6px; }
 .deliver-h small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
-#deliverText { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+#sendStatus { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+.live { font-size: 12px; font-weight: 600; color: var(--hit); margin-left: 8px; vertical-align: middle; animation: blink 1.4s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .live { animation: none; } .bar .fill, .meter span { transition: none; } }
 .meter { height: 10px; background: var(--empty); border-radius: 5px; overflow: hidden; }
 .meter span { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 5px; transition: width .4s; }
 .meter.done span { background: var(--good); }
@@ -136,7 +139,8 @@ figcaption { font-size: 14px; font-weight: 600; color: var(--text-2); margin-bot
 .bar .lot { font-family: var(--mono); font-size: 14px; color: var(--text-2); padding-left: 6px; }
 .bar.top .lot { color: var(--text); font-weight: 700; }
 .bar .track { height: 18px; position: relative; }
-.bar .fill { position: absolute; left: 0; top: 0; bottom: 0; min-width: 3px; background: var(--rest); border-radius: 0 4px 4px 0; }
+.bar .fill { position: absolute; left: 0; top: 0; bottom: 0; min-width: 3px; background: var(--rest); border-radius: 0 4px 4px 0; transition: width .6s ease; }
+.bar.low { opacity: .45; }
 .bar.top .fill { background: var(--hit); }
 .bar .val { font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .bar.top .val { color: var(--text); font-weight: 600; }
@@ -175,9 +179,6 @@ td.mono { font-family: var(--mono); font-size: 13px; }
 .verdict { font-size: 18px; font-weight: 700; margin: 0 0 6px; }
 .verdict.ok { color: var(--good-ink); }
 .verdict.ng { color: var(--bad-ink); }
-.result { margin-top: 14px; padding: 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
-.compare { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 15px; }
-.compare b { font-size: 26px; font-variant-numeric: tabular-nums; }
 
 /* DB */
 .dbgrid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin: 6px 0 14px; }

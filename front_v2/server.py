@@ -10,6 +10,7 @@ import os
 import random
 import sys
 import threading
+import time
 import traceback
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -19,9 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts import dbreset, services  # noqa: E402
 from scripts.common import GATEWAY_DSN, GATEWAY_URL, RECEIVER_DSN, connect, http  # noqa: E402
-from simulator.fleet import STORED_KINDS, FleetParams, run_fleet  # noqa: E402
-from simulator.payloads import SendItem, SendPlan  # noqa: E402
-from simulator.sender import send_plan  # noqa: E402
+from simulator.fleet import FleetParams, _summary, build_fleet  # noqa: E402
+from simulator.sender import send_parts, send_plan  # noqa: E402
 
 STATIC = Path(__file__).resolve().parent / "static"
 PORT = int(os.environ.get("SIM_FRONT_V2_PORT", "8071"))
@@ -32,9 +32,13 @@ SEVERITY = {"low": 0.15, "mid": 0.4, "high": 0.7}   # 결함 LOT 장착 차량�
 BASE_RATE = 0.02                                    # 정상 LOT 장착 차량의 고장 확률
 RESEND_RATE = 0.3                                   # 같은 진단 결과를 다시 보내는 비율 (통신 재전송)
 NOISE = {"unknown_lot_rate": 0.03, "replace_rate": 0.05, "no_history_rate": 0.01}
+SEND_SECONDS = 15        # 진단 결과를 이 시간에 걸쳐 나눠 보낸다(화면에서 쌓이는 과정을 보이기 위함)
+MIN_RATE = 30            # 초당 최소 전송 수
+CONCURRENCY = 16
 
-LOCK = threading.Lock()
-STORY = {}  # 마지막 실행: fleet, window, expected, trace
+LOCK = threading.Lock()  # 실행·초기화·서비스 켜기 중 하나만. 전송 스레드가 끝날 때 푼다
+STORY = {}  # 마지막 실행: window, expected, defect
+RUN = {}    # 진행 중이거나 마지막 실행의 상태 (전송 스레드가 갱신)
 
 
 class BadRequest(Exception):
@@ -121,6 +125,7 @@ def stored_results():
 
 
 def run_story(body):
+    """검증 후 DB를 비우고 전송 스레드를 띄운 뒤 바로 돌아간다. 진행은 /api/progress로 본다."""
     try:
         vehicles = int(body.get("vehicles", 300))
     except (TypeError, ValueError):
@@ -144,26 +149,58 @@ def run_story(body):
                          **(NOISE if noise else {k: 0.0 for k in NOISE}))
     if reset:
         dbreset.reset()
-    summary, fleet = run_fleet(params, return_fleet=True)
-    prod, sim = summary["production"], summary.get("simulation")
-    if not summary["ok"]:
-        print("전송 실패 production={} simulation={}".format(prod, sim and sim["byKind"]), file=sys.stderr)
-        step = "생산 이력" if not prod["ok"] else "진단 결과"
-        raise RuntimeError("{} 전송이 실패했습니다. gateway 상태를 확인한 뒤 다시 시도하세요".format(step))
-    trace = reverse(summary["window"])
     STORY.clear()
-    STORY.update(fleet=fleet, window=summary["window"], expected=summary["expected"], trace=trace, defect=defect)
-    by_kind = sim["byKind"]
-    return {
-        "setup": {"vehicles": vehicles, "lots": LOT_NAMES, "severity": severity, "noise": noise, "reset": reset,
-                  "ecuId": ECU, "dtcCode": DTC},
-        "received": {"partRows": prod["rows"], "partInserted": prod["inserted"],
-                     "diagSent": sum(sum(v.values()) for v in by_kind.values()),
-                     "diagResent": sum(by_kind.get("duplicate", {}).values()),
-                     "diagStored": stored_results()},
-        "trace": trace,
-        "answer": {"defectLot": defect, "expected": summary["expected"]},
-    }
+    # 차량군과 전송 순서는 여기서 전부 만들어 둔다. 기대값도 이 데이터만으로 미리 계산한다.
+    fleet = build_fleet(params)
+    summary = _summary(params, fleet)
+    total = len(fleet.plan.items)
+    rate = max(MIN_RATE, total / SEND_SECONDS)
+    setup = {"vehicles": vehicles, "lots": LOT_NAMES, "severity": severity, "noise": noise, "reset": reset,
+             "ecuId": ECU, "dtcCode": DTC, "ratePerSec": round(rate)}
+    RUN.clear()
+    RUN.update(state="parts", setup=setup, window=summary["window"], total=total, done=0, resent=0,
+               partRows=len(fleet.parts), startedAt=time.time(), error=None)
+    threading.Thread(target=_send, args=(fleet, summary, defect, rate), daemon=True).start()
+    return {"setup": setup, "total": total}
+
+
+def _send(fleet, summary, defect, rate):
+    """생산 이력 → 진단 결과(원본 → 재전송) 순으로 실제 gateway API에 보낸다. 끝나면 LOCK을 푼다."""
+    try:
+        prod = send_parts(fleet.batches, source="OEM-SIM", run_id=fleet.run_id)
+        if not prod["ok"]:
+            raise RuntimeError("생산 이력 전송이 실패했습니다. gateway 상태를 확인한 뒤 다시 시도하세요")
+        RUN.update(state="diag", partInserted=prod["inserted"])
+
+        def progress(report):
+            RUN["done"] = report.done
+            RUN["resent"] = sum(report.by_kind.get("duplicate", {}).values())
+
+        sim = send_plan(fleet.plan, concurrency=CONCURRENCY, rate_per_sec=rate, on_progress=progress).to_dict()
+        if not sim["ok"]:
+            print("전송 실패 simulation={}".format(sim["byKind"]), file=sys.stderr)
+            raise RuntimeError("진단 결과 전송이 실패했습니다. gateway 상태를 확인한 뒤 다시 시도하세요")
+        STORY.update(window=summary["window"], expected=summary["expected"], defect=defect)
+        RUN.update(state="done", done=sim["done"], resent=sum(sim["byKind"].get("duplicate", {}).values()),
+                   finishedAt=time.time())
+    except Exception as exc:  # noqa: BLE001
+        traceback.print_exc()
+        RUN.update(state="error", error=str(exc))
+    finally:
+        LOCK.release()
+
+
+def progress():
+    """진행 상태 + 지금 gateway DB 기준 역추적 결과. 기대값은 전송이 끝난 뒤에만 준다."""
+    if not RUN:
+        return {"state": "idle"}
+    run = {k: RUN.get(k) for k in ("state", "setup", "total", "done", "resent", "partRows", "partInserted", "error")}
+    run["elapsedSec"] = round((RUN.get("finishedAt") or time.time()) - RUN["startedAt"], 1)
+    run["diagStored"] = stored_results()
+    run["trace"] = reverse(RUN["window"]) if RUN["state"] in ("diag", "done") else None
+    if RUN["state"] == "done":
+        run["answer"] = {"defectLot": STORY["defect"], "expected": STORY["expected"]}
+    return run
 
 
 def forward(lot):
@@ -177,21 +214,6 @@ def forward(lot):
         raise RuntimeError("순추적 실패 HTTP {}: {}".format(res.status, res.body))
     data = res.data()
     return {"forward": data, "expected": STORY["expected"]["forward"].get(lot)}
-
-
-def replay():
-    """저장된 진단 결과를 전부 한 번 더 보낸다. 저장 건수와 추적 숫자가 그대로인지 본다."""
-    if not STORY:
-        raise BadRequest("먼저 데이터를 보내세요")
-    fleet = STORY["fleet"]
-    before = stored_results()
-    plan = SendPlan(fleet.run_id, [SendItem(1, "duplicate", item.payload) for item in fleet.plan.items
-                                   if item.kind in STORED_KINDS], fleet.plan.vehicles)
-    report = send_plan(plan, concurrency=8).to_dict()
-    after = stored_results()
-    trace = reverse(STORY["window"])
-    return {"resent": report["done"], "allOk": report["ok"], "before": before, "after": after,
-            "traceUnchanged": trace == STORY["trace"], "trace": trace}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -240,16 +262,24 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(200, ready())
             if route == ("GET", "/api/db"):
                 return self._json(200, db_snapshot())
+            if route == ("GET", "/api/progress"):
+                return self._json(200, progress())
             if route == ("GET", "/api/forward"):
                 return self._json(200, forward(query.get("lot", "")))
             handlers = {("POST", "/api/prepare"): lambda: prepare(),
                         ("POST", "/api/run"): lambda: run_story(self._body()),
-                        ("POST", "/api/replay"): lambda: replay(),
                         ("POST", "/api/reset"): lambda: reset_db()}
             if route not in handlers:
                 return self._json(404, {"error": "not found"})
             if not LOCK.acquire(blocking=False):
                 raise Busy("다른 작업이 진행 중입니다")
+            if route == ("POST", "/api/run"):
+                try:
+                    started = handlers[route]()
+                except BaseException:
+                    LOCK.release()
+                    raise
+                return self._json(200, started)  # LOCK은 전송 스레드가 끝날 때 푼다
             try:
                 return self._json(200, handlers[route]())
             finally:

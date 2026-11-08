@@ -1,4 +1,4 @@
-"""LOT 결함 차량군 생성과 전송 데이터만 이용한 독립 추적 정답 계산."""
+"""LOT 결함 차량군 생성과 전송 데이터만 이용한 독립 추적 기대값 계산."""
 import argparse
 import copy
 import json
