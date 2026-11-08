@@ -21,7 +21,9 @@ HTML을 브라우저에서 열고 URL 끝에 다음 쿼리를 붙이면 해당 �
 | `recovery.png` | `?diagram=recovery` | 1120 × 673 |
 | `comparison.png` | `?diagram=comparison` | 1120 × 623 |
 
-현재 루트 README는 `product-hero.png`, `project-features.png`, `product-console.png`, `product-proof.png`를 표시합니다. 나머지 도식은 구현 상세 문서에서 사용합니다.
+현재 루트 README는 `lot-trace-reverse.png`, `lot-trace-forward.png`, `product-console.png`, `product-proof.png`를 표시합니다. 나머지 도식은 구현 상세 문서에서 사용합니다.
+
+`lot-trace-*.png`는 diagrams.html이 아니라 [front_v2](../../../front_v2/README.md) 데모 화면을 Chrome에서 실행 후 단계별 섹션(2·3 역추적, 4 순추적)만 잘라 캡처한 것입니다. 수치는 캡처 당시 무작위 실행 결과입니다.
 
 `product-*` 도식은 [screens/](screens/)의 콘솔 화면 캡처(1440×900 화면, PNG 2880×1800)를 잘라 씁니다.
 콘솔 화면을 다시 캡처하면 `diagrams.html`의 `.shot` 위치·배율을 확인합니다.
