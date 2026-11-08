@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hopoong.diag.gateway.trace.persistence.TraceMapper">
+<resultMap id="lotBucketRow" type="com.hopoong.diag.gateway.trace.persistence.LotBucketRow"><constructor>
+    <arg column="bucket" javaType="java.lang.String"/>
+    <arg column="lot_no" javaType="java.lang.String"/>
+    <arg column="fault_vehicles" javaType="_long"/>
+    <arg column="diagnosed_vehicles" javaType="_long"/>
+</constructor></resultMap>
+<resultMap id="faultVehicleRow" type="com.hopoong.diag.gateway.trace.persistence.FaultVehicleRow"><constructor>
+    <arg column="vin" javaType="java.lang.String"/>
+    <arg column="serial_no" javaType="java.lang.String"/>
+    <arg column="first_fault_at" javaType="java.time.OffsetDateTime"/>
+</constructor></resultMap>
+<resultMap id="installedCountRow" type="com.hopoong.diag.gateway.trace.persistence.InstalledCountRow"><constructor>
+    <arg column="lot_no" javaType="java.lang.String"/>
+    <arg column="installed_vehicles" javaType="_long"/>
+</constructor></resultMap>
+<resultMap id="currentVehicleRow" type="com.hopoong.diag.gateway.trace.persistence.CurrentVehicleRow"><constructor>
+    <arg column="vin" javaType="java.lang.String"/>
+    <arg column="serial_no" javaType="java.lang.String"/>
+    <arg column="installed_at" javaType="java.time.OffsetDateTime"/>
+    <arg column="latest_diag_at" javaType="java.time.OffsetDateTime"/>
+    <arg column="latest_dtc_codes" javaType="[Ljava.lang.String;" typeHandler="org.apache.ibatis.type.ArrayTypeHandler"/>
+</constructor></resultMap>
+<!-- 역추적 귀속: 파라미터 ecuId, dtcCode, from, to. 결과 CTE `bucketed`(차량 1행) -->
+<sql id="faultAttribution">
+    WITH obs AS (
+        SELECT r.vin, r.occurred_at, (CAST(#{dtcCode} AS text) = ANY (o.dtc_codes)) AS has_dtc
+          FROM diagnostic_result r
+          JOIN ecu_observation o ON o.result_id = r.id
+         WHERE o.ecu_id = #{ecuId}
+           AND r.occurred_at &gt;= #{from} AND r.occurred_at &lt; #{to}
+    ),
+    veh AS (
+        SELECT vin,
+               MIN(occurred_at) FILTER (WHERE has_dtc) AS first_fault_at,
+               MAX(occurred_at)                         AS last_diag_at
+          FROM obs
+         GROUP BY vin
+    ),
+    attr AS (
+        SELECT v.vin, v.first_fault_at, (v.first_fault_at IS NOT NULL) AS faulty,
+               COUNT(p.id)      AS matches,
+               MIN(p.lot_no)    AS lot_no,
+               MIN(p.serial_no) AS serial_no
+          FROM veh v
+          LEFT JOIN vehicle_part p
+            ON p.vin = v.vin AND p.ecu_id = #{ecuId}
+           AND p.installed_at &lt;= COALESCE(v.first_fault_at, v.last_diag_at)
+           AND (p.removed_at IS NULL OR p.removed_at &gt; COALESCE(v.first_fault_at, v.last_diag_at))
+         GROUP BY v.vin, v.first_fault_at
+    ),
+    bucketed AS (
+        SELECT vin, first_fault_at, faulty,
+               CASE WHEN matches = 0 THEN 'NO_HISTORY'
+                    WHEN matches &gt; 1 THEN 'AMBIGUOUS'
+                    WHEN lot_no IS NULL THEN 'UNKNOWN_LOT'
+                    ELSE 'LOT' END                         AS bucket,
+               CASE WHEN matches = 1 THEN lot_no END       AS lot_no,
+               CASE WHEN matches = 1 THEN serial_no END    AS serial_no
+          FROM attr
+    )
+</sql>
+
+<select id="aggregateLots" resultMap="lotBucketRow">
+    <include refid="faultAttribution"/>
+    SELECT bucket, lot_no,
+           COUNT(*) FILTER (WHERE faulty) AS fault_vehicles,
+           COUNT(*)                       AS diagnosed_vehicles
+      FROM bucketed
+     GROUP BY bucket, lot_no
+     ORDER BY bucket, lot_no
+</select>
+
+<select id="findFaultVehicles" resultMap="faultVehicleRow">
+    <include refid="faultAttribution"/>
+    SELECT vin, serial_no, first_fault_at
+      FROM bucketed
+     WHERE bucket = 'LOT' AND lot_no = #{lotNo} AND faulty
+     ORDER BY first_fault_at, vin
+     LIMIT #{limit}
+</select>
+
+<select id="countInstalledVehicles" resultMap="installedCountRow">
+    SELECT p.lot_no, COUNT(DISTINCT p.vin) AS installed_vehicles
+      FROM vehicle_part p
+     WHERE p.ecu_id = #{ecuId}
+       AND p.lot_no IN <foreach collection="lotNos" item="lot" open="(" separator="," close=")">#{lot}</foreach>
+     GROUP BY p.lot_no
+</select>
+<!-- 순추적·캠페인 공용 대상 조건. 03 CampaignMapper가 전체 이름으로 include한다.
+     전제: vehicle_part 별칭 p, 문장 파라미터 이름 ecuId·lotNo. 조건을 바꾸면 순추적과 캠페인 스냅샷이 함께 바뀐다. -->
+<sql id="currentLotVehicles">
+    p.ecu_id = #{ecuId} AND p.lot_no = #{lotNo} AND p.removed_at IS NULL
+</sql>
+
+<select id="countCurrentVehicles" resultType="long">
+    SELECT COUNT(*) FROM vehicle_part p WHERE <include refid="currentLotVehicles"/>
+</select>
+
+<select id="countExcludedRemoved" resultType="long">
+    SELECT COUNT(DISTINCT p.vin)
+      FROM vehicle_part p
+     WHERE p.ecu_id = #{ecuId} AND p.lot_no = #{lotNo} AND p.removed_at IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM vehicle_part c
+                        WHERE c.vin = p.vin AND c.ecu_id = p.ecu_id
+                          AND c.lot_no = p.lot_no AND c.removed_at IS NULL)
+</select>
+
+<select id="findCurrentVehicles" resultMap="currentVehicleRow">
+    SELECT p.vin, p.serial_no, p.installed_at,
+           l.occurred_at AS latest_diag_at, l.dtc_codes AS latest_dtc_codes
+      FROM vehicle_part p
+      LEFT JOIN vehicle_ecu_latest l ON l.vin = p.vin AND l.ecu_id = p.ecu_id
+     WHERE <include refid="currentLotVehicles"/>
+     ORDER BY p.vin
+     LIMIT #{limit}
+</select>
+</mapper>

@@ -34,9 +34,9 @@ class GatewayApplicationIT {
         assertThat(deliveryProperties.enabled()).isFalse();
         assertThat(jdbc.queryForObject(
                 "select count(*) from flyway_schema_history where success = true and version is not null",
-                Integer.class)).isEqualTo(3);
+                Integer.class)).isEqualTo(4);
         for (String table : new String[]{"diagnostic_result", "ecu_observation", "vehicle_ecu_latest",
-                "outbox_event", "delivery_attempt", "ops_action_log"}) {
+                "outbox_event", "delivery_attempt", "ops_action_log", "vehicle_part"}) {
             assertThat(jdbc.queryForObject("select to_regclass(?)::text", String.class, table))
                     .isEqualTo(table);
         }

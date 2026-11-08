@@ -15,7 +15,7 @@ class ScenarioEnvironmentIT extends ScenarioITSupport {
     @Override protected ReceiverRunner receiver() { return RECEIVER; }
 
     @Test void databasesAndConfigurationAreIsolated() {
-        assertThat(gatewayJdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(3);
+        assertThat(gatewayJdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(4);
         assertThat(receiver().jdbc().queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(1);
         assertThat(receiver().jdbc().queryForObject("SELECT current_database()", String.class)).isEqualTo("receiver");
         assertThat(receiver().jdbc().queryForObject("SELECT to_regclass('outbox_event')::text", String.class)).isNull();

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hopoong.diag.gateway.production.persistence.VehiclePartMapper">
+<select id="upsert" resultType="boolean" affectData="true" flushCache="true">
+    INSERT INTO vehicle_part (vin, ecu_id, part_no, serial_no, lot_no, installed_at, removed_at)
+    VALUES
+    <foreach collection="rows" item="r" separator=",">
+        (#{r.vin}, #{r.ecuId}, #{r.partNo}, #{r.serialNo}, #{r.lotNo}, #{r.installedAt}, #{r.removedAt})
+    </foreach>
+    ON CONFLICT (vin, ecu_id, serial_no) DO UPDATE
+       SET part_no = EXCLUDED.part_no, lot_no = EXCLUDED.lot_no,
+           installed_at = EXCLUDED.installed_at, removed_at = EXCLUDED.removed_at, updated_at = now()
+     WHERE (vehicle_part.part_no, vehicle_part.lot_no, vehicle_part.installed_at, vehicle_part.removed_at)
+           IS DISTINCT FROM (EXCLUDED.part_no, EXCLUDED.lot_no, EXCLUDED.installed_at, EXCLUDED.removed_at)
+    RETURNING (xmax = 0) AS inserted
+</select>
+</mapper>
