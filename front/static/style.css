@@ -211,6 +211,7 @@ figcaption { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bot
   font: 12px/1.55 var(--mono); height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-all;
 }
 .console.tall { height: 520px; }
+.console.short { height: 160px; margin-top: 10px; }
 .console .ok { color: #6fd66f; }
 .console .ng { color: #ff8080; }
 .console .st { color: #8fb8ff; }
@@ -252,3 +253,22 @@ table.grid { width: 100%; border-collapse: collapse; font-size: 12px; }
   .top { position: static; padding: 10px 16px; }
   .pills { margin-left: 0; }
 }
+
+/* trace */
+.fleet { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.fleet-reset { grid-column: 1 / -1; }
+.trace-q { display: grid; grid-template-columns: 90px 90px minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 10px; align-items: end; margin-bottom: 12px; }
+@media (max-width: 860px) {
+  .fleet { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trace-q { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.grid td.num, .grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.grid tr.sel td { background: var(--surface-2); }
+.grid td.diff { color: var(--critical-ink); font-weight: 600; }
+.grid .exp { display: block; color: var(--muted); font-size: 10px; }
+.kv.sub { margin-top: 12px; }
+.kv.sub b { font-size: 15px; }
+.kv .exp { display: block; font-size: 10px; color: var(--muted); }
+.rate { display: inline-block; height: 6px; border-radius: 3px; background: var(--series-2); vertical-align: middle; margin-right: 6px; }
+.notes { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+#traceResult td, #forwardResult td { white-space: nowrap; }

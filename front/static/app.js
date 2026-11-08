@@ -7,7 +7,8 @@ const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString("ko-KR"));
 const state = {
   services: null, fault: null, job: null, canPause: true,
   logCursor: 0, jobId: null, samples: [], scenarios: [], lastResult: {},
-  opsStatus: "DEAD", logSel: "gateway", tab: "scenarios",
+  opsStatus: "DEAD", logSel: "gateway", tab: "trace",
+  fleet: null, fleetJobId: null, trace: null, fwdLot: null,
 };
 
 async function api(path, opts = {}) {
@@ -35,6 +36,7 @@ async function startJob(body) {
     state.jobId = job.id; state.logCursor = 0;
     $("#console").innerHTML = ""; $("#jobResult").innerHTML = "";
     if (body.type === "scenario" || body.type === "simulate") selectTab("scenarios");
+    if (body.type === "fleet") { $("#fleetLog").innerHTML = ""; $("#fleetLog").hidden = false; $("#fleetSummary").innerHTML = ""; }
     pollJob();
   } catch (e) { toast(e.message, true); }
 }
@@ -272,7 +274,7 @@ async function pollJob() {
       const j = await api("jobs/current?since=" + state.logCursor);
       if (!j) break;
       if (j.id !== state.jobId) { state.jobId = j.id; state.logCursor = 0; $("#console").innerHTML = ""; continue; }
-      appendLogs(j.logs); state.logCursor = j.logCount;
+      appendLogs(j.logs, j.kind); state.logCursor = j.logCount;
       renderJob(j);
       if (j.state !== "running") break;
       await sleep(700);
@@ -282,14 +284,17 @@ async function pollJob() {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function appendLogs(lines) {
+function appendLogs(lines, kind) {
   if (!lines.length) return;
-  const c = $("#console"); const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 40;
-  c.insertAdjacentHTML("beforeend", lines.map((l) => {
+  const html = lines.map((l) => {
     const cls = l.includes("✔") || l.includes("PASS") && l.includes("결과") ? "ok" : l.includes("✘") || l.includes("FAIL") ? "ng" : l.includes("▶") || l.includes("=====") ? "st" : "";
     return `<span class="${cls}">${esc(l)}</span>\n`;
-  }).join(""));
-  if (atBottom) c.scrollTop = c.scrollHeight;
+  }).join("");
+  for (const c of kind === "fleet" ? [$("#console"), $("#fleetLog")] : [$("#console")]) {
+    const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 40;
+    c.insertAdjacentHTML("beforeend", html);
+    if (atBottom) c.scrollTop = c.scrollHeight;
+  }
 }
 
 function renderJob(j) {
@@ -311,11 +316,13 @@ function renderJob(j) {
   } else if (j.state === "failed") {
     $("#jobResult").innerHTML = `<ul class="checks"><li class="fail"><span class="mark">✘</span><span>${esc(j.error)}</span></li></ul>`;
   }
+  if (j.kind === "fleet") renderFleetJob(j);
   renderScenarios(); renderServices();
 }
 
 function resultHtml(r) {
   let h = "";
+  if (r.fleet) return fleetSummaryHtml(r.fleet);
   if (r.batch) {
     h += `<ul class="checks">${r.batch.map((b) => `<li class="${b.passed ? "pass" : "fail"}"><span class="mark">${b.passed ? "✔" : "✘"}</span><span><b>${b.scenario}</b> ${esc(b.title)} <span class="d">${b.elapsedSec}s ${esc(b.error || "")}</span></span></li>`).join("")}</ul>`;
     return h;
@@ -328,6 +335,7 @@ function resultHtml(r) {
       <p class="hint">run ${esc(sim.runId)} · 저장 기대 ${fmt(sim.expectedResults)}건 · p50 ${sim.latencyMs.p50}ms · p95 ${sim.latencyMs.p95}ms · ${sim.throughputPerSec}/s · 기대와 다른 응답 ${sim.unexpectedCount}건</p>`;
     if (sim.unexpected?.length) h += `<pre class="preview">${esc(JSON.stringify(sim.unexpected.slice(0, 3), null, 2))}</pre>`;
   }
+  if (r.trace) h += t1TraceHtml(r.trace);
   if (r.reconcile) h += `<div class="resline">${esc(r.reconcile.line)}</div>`;
   return h;
 }
@@ -400,6 +408,203 @@ $("#logSel").addEventListener("click", (ev) => {
   $("#svcLog").scrollTop = 1e9; loadLog();
 });
 
+/* ------------------------------------------------------------------ 결함 추적 */
+const pct = (v) => (v == null ? "-" : (v * 100).toFixed(1) + "%");
+const ms = (v) => (v ? Date.parse(v) : NaN);
+const TRACE_FIELDS = [["faultVehicles", "고장 차량"], ["diagnosedVehicles", "진단 차량"], ["installedVehicles", "장착 차량"]];
+const BUCKETS = [["unknownLot", "LOT 미확인"], ["noHistory", "이력 없음"], ["ambiguous", "이력 모호"]];
+
+function renderDefectLots() {
+  const n = Math.max(1, Math.min(20, Number($("#fleetForm [name=lots]").value) || 1));
+  const sel = $("#fleetDefectLot"); const prev = sel.value || "L-2403";
+  const lots = Array.from({ length: n }, (_, i) => `L-24${String(i + 1).padStart(2, "0")}`);
+  sel.innerHTML = lots.map((l) => `<option${l === prev ? " selected" : ""}>${l}</option>`).join("");
+  if (!lots.includes(prev)) sel.value = lots[Math.min(2, n - 1)];
+}
+$("#fleetForm [name=lots]").addEventListener("input", renderDefectLots);
+$("#btnFleetStop").addEventListener("click", () => api("jobs/stop", { method: "POST" }).catch((e) => toast(e.message, true)));
+$("#fleetForm [name=reset]").addEventListener("change", (ev) => ($("#fleetResetHint").hidden = ev.target.checked));
+$("#fleetForm").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const params = Object.fromEntries(new FormData(ev.target).entries());
+  params.reset = ev.target.reset.checked;
+  if (params.reset && !confirm("로컬 gateway·receiver DB를 초기화한 뒤 차량군을 전송합니다.")) return;
+  state.fleetJobId = null;
+  startJob({ type: "fleet", params });
+});
+
+function renderFleetJob(j) {
+  const st = $("#fleetState");
+  const stopped = !!(j.result?.fleet?.simulation?.stopped || j.result?.fleet?.production?.stopped);
+  st.textContent = (stopped ? "중단" : { running: "전송 중", done: "완료", failed: "실패" }[j.state]) + ` · ${j.elapsedSec}s`;
+  st.className = "tag " + (j.state === "running" ? "run" : j.state === "done" ? "good" : stopped ? "warn" : "bad");
+  const p = j.progress; const bar = $("#fleetProgress");
+  bar.hidden = !(j.state === "running" && p && p.total);
+  if (p && p.total) $("div", bar).style.width = (p.done / p.total) * 100 + "%";
+  $("#btnFleet").disabled = j.state === "running";
+  $("#btnFleetStop").disabled = j.state !== "running";
+  if (j.state === "running" || state.fleetJobId === j.id) return;
+  state.fleetJobId = j.id;
+  if (j.result?.fleet) {
+    const f = j.result.fleet;
+    $("#fleetSummary").innerHTML = fleetSummaryHtml(f);
+    state.fleet = f;
+    if (!f.stale) { fillWindow(); runTrace(); }
+    else if (state.trace) renderTrace();
+  } else if (j.error) {
+    $("#fleetSummary").innerHTML = `<ul class="checks"><li class="fail"><span class="mark">✘</span><span>${esc(j.error)}</span></li></ul>`;
+  }
+}
+
+function fleetSummaryHtml(f) {
+  const prod = f.production || {}; const sim = f.simulation;
+  const exp = f.stale ? {} : f.expected?.totals || {};
+  const kinds = sim ? Object.entries(sim.byKind).map(([k, v]) => `${k} ${Object.entries(v).map(([s, n]) => `${s}×${fmt(n)}`).join(" ")}`).join(" · ") : "-";
+  const kv = [["생산 이력 행", prod.rows], ["batch", prod.batches], ["inserted", prod.inserted], ["updated", prod.updated],
+    ["진단 저장 기대", sim?.expectedResults], ["정답 고장 차량", exp.faultVehicles], ["정답 진단 차량", exp.diagnosedVehicles]]
+    .map(([k, v]) => `<div><span>${k}</span><b>${fmt(v)}</b></div>`).join("");
+  const warn = f.reset === false ? `<p class="hint">⚠ 초기화 없이 실행했습니다. 이전 데이터가 있으면 정답 비교가 맞지 않습니다.</p>` : "";
+  const fail = !prod.ok ? `<ul class="checks"><li class="fail"><span class="mark">✘</span><span>생산 이력 실패 batch ${esc(prod.failedBatch)} · HTTP ${esc(prod.status)}<br><span class="d">${esc(JSON.stringify(prod.body))}</span></span></li></ul>` : "";
+  const stale = f.stale ? `<p class="hint">⚠ 정답 비교 안 함: ${esc(f.stale)}</p>` : "";
+  return `<div class="kv sub">${kv}</div>${fail}${stale}
+    <p class="hint">run ${esc(f.runId)} · 진단 응답 ${esc(kinds)} · 기대와 다른 응답 ${fmt(sim?.unexpectedCount ?? 0)}건 · 기간 ${esc(f.window?.from)} ~ ${esc(f.window?.to)}</p>${warn}`;
+}
+
+async function loadLastFleet() {
+  try {
+    const f = await api("fleet/last");
+    const first = !state.fleet && f;
+    state.fleet = f;
+    if (first) { fillWindow(); if (!state.trace) $("#fleetSummary").innerHTML = fleetSummaryHtml(f); }
+    if (state.trace) renderTrace();
+  } catch (e) { /* 서버 재시작 중 */ }
+}
+function fillWindow() {
+  if (!state.fleet) return toast("전송한 차량군이 없습니다", true);
+  const f = $("#traceForm");
+  f.ecuId.value = state.fleet.expected.ecuId; f.dtcCode.value = state.fleet.expected.dtcCode;
+  f.from.value = state.fleet.window.from; f.to.value = state.fleet.window.to;
+}
+$("#btnTraceFill").addEventListener("click", fillWindow);
+$("#traceForm").addEventListener("submit", (ev) => { ev.preventDefault(); runTrace(); });
+
+async function runTrace() {
+  const form = $("#traceForm");
+  for (const k of ["ecuId", "dtcCode"]) form[k].value = form[k].value.trim().toUpperCase();
+  const q = Object.fromEntries([...new FormData(form).entries()].filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()]));
+  $("#traceResult").innerHTML = '<p class="empty">조회 중…</p>';
+  try {
+    const data = (await api("trace/lots?" + new URLSearchParams(q))).data;
+    state.trace = data;
+    renderTrace();
+    if (state.fwdLot && data.lots.some((l) => l.lotNo === state.fwdLot)) runForward(state.fwdLot);
+    else { state.fwdLot = null; $("#forwardCard").hidden = true; }
+  } catch (e) {
+    state.trace = null; state.fwdLot = null; $("#forwardCard").hidden = true;
+    $("#traceResult").innerHTML = `<p class="empty">${esc(apiErrorText(e))}</p>`;
+    setTag($("#traceMatch"), "-", "");
+  }
+}
+
+/** 정답 비교 기준: 마지막 차량군과 ECU·DTC·기간(시각 값)이 같고, 이후 DB가 바뀌지 않았을 때. */
+function comparable(data) {
+  const f = state.fleet;
+  if (!f) return { ok: false, why: "정답 없음 · 차량군 미전송" };
+  if (f.stale) return { ok: false, why: "정답 없음 · " + f.stale };
+  if (!data) return { ok: true };
+  if (data.ecuId !== f.expected.ecuId || data.dtcCode !== f.expected.dtcCode) return { ok: false, why: "정답 없음 · 조건 다름" };
+  if (ms(data.from) !== ms(f.window.from) || ms(data.to) !== ms(f.window.to)) return { ok: false, why: "정답 없음 · 기간 다름" };
+  return { ok: true };
+}
+/** gateway 검증 오류는 필드별 메시지를, 그 밖에는 제목·오류 문구를 보여준다. */
+function apiErrorText(e) {
+  const errors = e.body?.errors;
+  if (errors?.length) return errors.map((x) => (x.field ? `${x.field}: ` : "") + x.message).join(" · ");
+  return e.message;
+}
+function setTag(el, text, cls) { el.textContent = text; el.className = "tag " + cls; }
+
+function renderTrace() {
+  const d = state.trace; if (!d) return;
+  const cmp = comparable(d); const exp = cmp.ok ? state.fleet.expected : null;
+  const expLots = Object.fromEntries((exp?.lots || []).map((l) => [l.lotNo, l]));
+  const lotNos = [...d.lots.map((l) => l.lotNo), ...Object.keys(expLots).filter((n) => !d.lots.some((l) => l.lotNo === n))];
+  let matched = 0;
+  const maxRate = Math.max(0.0001, ...d.lots.map((l) => l.faultRate));
+  const rows = lotNos.map((lotNo) => {
+    const a = d.lots.find((l) => l.lotNo === lotNo); const e = expLots[lotNo];
+    const same = exp && a && e && TRACE_FIELDS.every(([k]) => a[k] === e[k]);
+    if (same) matched++;
+    const cell = (k) => {
+      const v = a?.[k]; const diff = exp && (!e || v !== e[k]);
+      return `<td class="num${diff ? " diff" : ""}">${fmt(v)}${diff ? `<span class="exp">정답 ${fmt(e?.[k])}</span>` : ""}</td>`;
+    };
+    const mark = exp ? `<td><span class="verdict ${same ? "PASS" : "FAIL"}">${same ? "✔" : "✘"}</span></td>` : "";
+    return `<tr class="click${state.fwdLot === lotNo ? " sel" : ""}" data-lot="${esc(lotNo)}"><td class="mono">${esc(lotNo)}</td>
+      ${TRACE_FIELDS.map(([k]) => cell(k)).join("")}
+      <td class="num"><span class="rate" style="width:${a ? Math.round((a.faultRate / maxRate) * 60) : 0}px"></span>${a ? pct(a.faultRate) : "-"}</td>
+      <td class="num">${a ? pct(a.otherLotsFaultRate) : "-"}</td>
+      <td>${a?.lowSample ? `<span class="tag warn">표본 부족</span>` : ""}</td>${mark}</tr>`;
+  }).join("");
+  const sameUn = exp && BUCKETS.every(([k]) => ["faultVehicles", "diagnosedVehicles"].every((f) => d.unattributed[k][f] === exp.unattributed[k][f]));
+  const sameTot = exp && d.totals.faultVehicles === exp.totals.faultVehicles && d.totals.diagnosedVehicles === exp.totals.diagnosedVehicles;
+  const pair = (v, e) => `<b>${fmt(v.faultVehicles)} / ${fmt(v.diagnosedVehicles)}</b>` +
+    (e && (v.faultVehicles !== e.faultVehicles || v.diagnosedVehicles !== e.diagnosedVehicles) ? `<span class="exp">정답 ${fmt(e.faultVehicles)} / ${fmt(e.diagnosedVehicles)}</span>` : "");
+  const kv = [...BUCKETS.map(([k, l]) => [l, pair(d.unattributed[k], exp?.unattributed[k])]), ["합계", pair(d.totals, exp?.totals)]]
+    .map(([k, v]) => `<div><span>${k} · 고장 / 진단</span>${v}</div>`).join("");
+  $("#traceResult").innerHTML = `<div class="table-wrap"><table class="grid"><thead><tr><th>LOT</th>
+      ${TRACE_FIELDS.map(([, l]) => `<th class="num">${l}</th>`).join("")}<th class="num">고장률</th><th class="num">다른 LOT 고장률</th><th></th>${exp ? "<th>정답</th>" : ""}</tr></thead>
+      <tbody>${rows || `<tr><td colspan="8" class="empty">조건에 맞는 진단 차량이 없습니다.</td></tr>`}</tbody></table></div>
+    <div class="kv sub">${kv}</div>
+    <ul class="notes">${(d.notes || []).map((n) => `<li>${esc(n)}</li>`).join("")}<li>표본 부족: 진단 차량 ${fmt(d.minSample)}대 미만 · 기간 ${esc(d.from)} ~ ${esc(d.to)} · LOT 행을 누르면 순추적</li></ul>`;
+  if (!exp) setTag($("#traceMatch"), cmp.why, "");
+  else {
+    const all = matched === lotNos.length && sameUn && sameTot;
+    setTag($("#traceMatch"), `정답 ${all ? "일치" : "불일치"} · LOT ${matched}/${lotNos.length} · 미귀속 ${sameUn ? "✔" : "✘"} · 합계 ${sameTot ? "✔" : "✘"}`, all ? "good" : "bad");
+  }
+}
+$("#traceResult").addEventListener("click", (ev) => { const tr = ev.target.closest("[data-lot]"); if (tr) runForward(tr.dataset.lot); });
+
+async function runForward(lotNo) {
+  state.fwdLot = lotNo;
+  $$("#traceResult [data-lot]").forEach((tr) => tr.classList.toggle("sel", tr.dataset.lot === lotNo));
+  const ecuId = state.trace?.ecuId || $("#traceForm").ecuId.value;
+  $("#forwardCard").hidden = false; $("#forwardTitle").textContent = `${lotNo} · ${ecuId} 현재 장착 차량`;
+  $("#forwardResult").innerHTML = '<p class="empty">조회 중…</p>';
+  try {
+    const d = (await api(`trace/lots/${encodeURIComponent(lotNo)}/vehicles?` + new URLSearchParams({ ecuId, limit: 200 }))).data;
+    const cmp = comparable(null); const e = cmp.ok && ecuId === state.fleet.expected.ecuId ? state.fleet.expected.forward?.[lotNo] : null;
+    const dtc = state.trace?.dtcCode;
+    const val = (k, l) => { const diff = e && d[k] !== e[k]; return `<div><span>${l}</span><b>${fmt(d[k])}</b>${diff ? `<span class="exp">정답 ${fmt(e[k])}</span>` : ""}</div>`; };
+    const rows = d.vehicles.map((v) => `<tr><td class="mono">${esc(v.vin)}</td><td class="mono">${esc(v.serialNo)}</td>
+      <td class="mono">${esc((v.installedAt || "").replace("T", " ").slice(0, 19))}</td><td class="mono">${esc((v.latestDiagAt || "-").replace("T", " ").slice(0, 19))}</td>
+      <td class="mono">${(v.latestDtcCodes || []).map((c) => (c === dtc ? `<b>${esc(c)}</b>` : esc(c))).join(" ") || "-"}</td></tr>`).join("");
+    $("#forwardResult").innerHTML = `<div class="kv">${val("currentVehicles", "현재 장착 차량")}${val("excludedRemoved", "탈거 제외")}</div>
+      <div class="table-wrap" style="margin-top:12px"><table class="grid"><thead><tr><th>VIN</th><th>시리얼</th><th>장착 시각 (UTC)</th><th>최근 진단 (UTC)</th><th>최근 DTC</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" class="empty">현재 장착 차량이 없습니다.</td></tr>'}</tbody></table></div>
+      ${d.truncated ? `<p class="hint">상위 ${fmt(d.vehicles.length)}대만 표시합니다.</p>` : ""}`;
+    if (!e) setTag($("#forwardMatch"), cmp.ok ? "정답 없음" : cmp.why, "");
+    else {
+      const same = d.currentVehicles === e.currentVehicles && d.excludedRemoved === e.excludedRemoved;
+      setTag($("#forwardMatch"), `정답 ${same ? "일치" : "불일치"}`, same ? "good" : "bad");
+    }
+  } catch (err) {
+    $("#forwardResult").innerHTML = `<p class="empty">${esc(apiErrorText(err))}</p>`;
+    setTag($("#forwardMatch"), "-", "");
+  }
+}
+
+function t1TraceHtml(t) {
+  const rows = t.lots.map((l) => {
+    const same = l.expected && TRACE_FIELDS.every(([k]) => l.api[k] === l.expected[k]);
+    return `<tr><td class="mono">${esc(l.lotNo)}</td>${TRACE_FIELDS.map(([k]) => `<td class="num${same ? "" : " diff"}">${fmt(l.api[k])}<span class="exp">정답 ${fmt(l.expected?.[k])}</span></td>`).join("")}
+      <td><span class="verdict ${same ? "PASS" : "FAIL"}">${same ? "✔" : "✘"}</span></td></tr>`;
+  }).join("");
+  const tot = (v) => `${fmt(v.faultVehicles)} / ${fmt(v.diagnosedVehicles)}`;
+  return `<div class="table-wrap" style="margin-top:10px"><table class="grid"><thead><tr><th>LOT</th>${TRACE_FIELDS.map(([, l]) => `<th class="num">${l}</th>`).join("")}<th>정답</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">결함 LOT 1위 ${esc(t.topLot)} · 합계 API ${tot(t.totals.api)} / 정답 ${tot(t.totals.expected)} · 기간 ${esc(t.window.from)} ~ ${esc(t.window.to)}</p>`;
+}
+
 /* ------------------------------------------------------------------ 탭 */
 function selectTab(name) {
   state.tab = name;
@@ -408,6 +613,7 @@ function selectTab(name) {
   if (name === "ops") loadOps();
   if (name === "logs") loadLog();
   if (name === "history") loadHistory();
+  if (name === "trace") loadLastFleet();
 }
 $(".tabs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-tab]"); if (b) selectTab(b.dataset.tab); });
 
@@ -430,6 +636,8 @@ async function tick() {
 let opsTick = 0;
 
 loadScenarios().catch((e) => toast(e.message, true));
+renderDefectLots();
+loadLastFleet();
 loadHistory();
 tick();
 setInterval(tick, 1500);

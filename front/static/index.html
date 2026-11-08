@@ -13,7 +13,7 @@
     <span class="logo" aria-hidden="true">◆</span>
     <div>
       <h1>Diag Gateway Lab</h1>
-      <p class="sub">가상 단말 · 장애 주입 · 정합성 대조</p>
+      <p class="sub">결함 추적 · 가상 단말 · 장애 주입 · 정합성 대조</p>
     </div>
   </div>
   <div class="pills" id="pills"></div>
@@ -87,14 +87,61 @@
     </section>
 
     <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="scenarios" aria-selected="true">시나리오</button>
+      <button role="tab" data-tab="trace" aria-selected="true">결함 추적</button>
+      <button role="tab" data-tab="scenarios" aria-selected="false">시나리오</button>
       <button role="tab" data-tab="ops">운영 콘솔</button>
       <button role="tab" data-tab="recon">대조 결과</button>
       <button role="tab" data-tab="logs">서비스 로그</button>
       <button role="tab" data-tab="history">실행 기록</button>
     </nav>
 
-    <section class="tab" id="tab-scenarios">
+    <section class="tab" id="tab-trace">
+      <div class="card">
+        <div class="card-h"><h2>1. 차량군 생성 <span class="muted">생산 이력 → 진단 결과 전송</span></h2>
+          <div class="row"><span id="fleetState" class="tag">대기</span>
+            <button class="btn ghost sm" id="btnFleetStop" disabled>중단</button></div>
+        </div>
+        <form id="fleetForm" class="fleet">
+          <label class="field">차량 수<input name="vehicles" type="number" min="1" max="5000" value="300"></label>
+          <label class="field">LOT 수<input name="lots" type="number" min="1" max="20" value="6"></label>
+          <label class="field">결함 LOT<select name="defectLot" id="fleetDefectLot"></select></label>
+          <label class="field">차량당 진단 수<input name="diagPerVehicle" type="number" min="1" max="10" value="2"></label>
+          <label class="field">결함 LOT 고장률<input name="defectRate" type="number" min="0" max="1" step="0.01" value="0.4"></label>
+          <label class="field">다른 LOT 고장률<input name="baseRate" type="number" min="0" max="1" step="0.01" value="0.02"></label>
+          <label class="field">LOT 미확인 비율<input name="unknownLotRate" type="number" min="0" max="1" step="0.01" value="0.03"></label>
+          <label class="field">부품 교체 비율<input name="replaceRate" type="number" min="0" max="1" step="0.01" value="0.05"></label>
+          <label class="field">이력 없음 비율<input name="noHistoryRate" type="number" min="0" max="1" step="0.01" value="0.01"></label>
+          <label class="field">재전송 비율<input name="duplicateRate" type="number" min="0" max="1" step="0.05" value="0.3"></label>
+          <label class="field">seed<input name="seed" type="number" placeholder="무작위" value="42"></label>
+          <label class="check fleet-reset"><input type="checkbox" name="reset" checked> 실행 전 DB 초기화</label>
+          <button class="btn primary wide" type="submit" id="btnFleet">차량군 전송</button>
+        </form>
+        <p class="hint" id="fleetResetHint" hidden>초기화하지 않으면 이전 데이터가 섞여 정답 비교가 맞지 않을 수 있습니다.</p>
+        <div class="progress" id="fleetProgress" hidden><div></div></div>
+        <div id="fleetSummary"></div>
+        <pre class="console short" id="fleetLog" aria-live="polite" hidden></pre>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>2. 역추적 <span class="muted">고장코드 → 공통 부품 LOT</span></h2><span id="traceMatch" class="tag">-</span></div>
+        <form id="traceForm" class="trace-q">
+          <label class="field">ECU<input name="ecuId" value="TCM" required></label>
+          <label class="field">DTC<input name="dtcCode" value="P0700" required></label>
+          <label class="field">from<input name="from" placeholder="기본: to - 30일"></label>
+          <label class="field">to<input name="to" placeholder="기본: 지금"></label>
+          <button class="btn primary" type="submit">조회</button>
+          <button class="btn ghost" type="button" id="btnTraceFill" title="마지막 차량군의 조회 기간으로 채움">차량군 기간</button>
+        </form>
+        <div id="traceResult"><p class="empty">차량군을 전송하거나 조건을 입력해 조회하세요.</p></div>
+      </div>
+
+      <div class="card" id="forwardCard" hidden>
+        <div class="card-h"><h2>3. 순추적 <span class="muted" id="forwardTitle"></span></h2><span id="forwardMatch" class="tag">-</span></div>
+        <div id="forwardResult"></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-scenarios" hidden>
       <div class="card">
         <div class="card-h"><h2>장애 시나리오</h2>
           <div class="row">

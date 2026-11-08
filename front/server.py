@@ -3,7 +3,7 @@
     python3 front/server.py            # http://127.0.0.1:8070
 
 표준 라이브러리 HTTP 서버로 정적 파일(front/static)과 /api/*를 제공한다.
-/api는 simulator·scripts 모듈을 그대로 호출하며, gateway 운영 API는 CORS 없이 쓰도록 중계한다.
+/api는 simulator·scripts 모듈을 그대로 호출하며, gateway 운영·추적 API는 CORS 없이 쓰도록 중계한다.
 로컬 개발 전용이다. 127.0.0.1에만 바인딩하며 인증이 없다.
 """
 import json
@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts import dbreset, fault, reconcile, scenarios, services  # noqa: E402
 from scripts.common import GATEWAY_URL, http  # noqa: E402
+from simulator.fleet import FleetParams, run_fleet  # noqa: E402
 from simulator.payloads import build_plan  # noqa: E402
 from simulator.sender import send_plan  # noqa: E402
 
@@ -162,6 +163,87 @@ def job_simulate(p):
     return "simulate", "시뮬레이터 {}건".format(kwargs["count"]), fn
 
 
+LAST_FLEET = None  # 마지막 차량군 전송 요약 (정답 비교용, 서버 메모리에만 보관)
+
+FLEET_INT = ("vehicles", "lots", "diag_per_vehicle", "seed")
+FLEET_FLOAT = ("defect_rate", "base_rate", "unknown_lot_rate", "replace_rate", "no_history_rate", "duplicate_rate")
+FLEET_KEYS = {"vehicles": "vehicles", "lots": "lots", "defectLot": "defect_lot", "defectRate": "defect_rate",
+              "baseRate": "base_rate", "unknownLotRate": "unknown_lot_rate", "replaceRate": "replace_rate",
+              "noHistoryRate": "no_history_rate", "diagPerVehicle": "diag_per_vehicle",
+              "duplicateRate": "duplicate_rate", "seed": "seed"}
+
+
+def mark_fleet_stale(reason):
+    """DB가 바뀌면 마지막 차량군 정답은 더는 비교 기준이 아니다."""
+    if LAST_FLEET is not None and not LAST_FLEET.get("stale"):
+        LAST_FLEET["stale"] = reason
+
+
+def fleet_params(p):
+    kwargs = {}
+    for key, name in FLEET_KEYS.items():
+        value = p.get(key)
+        if value in (None, ""):
+            continue
+        try:
+            kwargs[name] = int(value) if name in FLEET_INT else float(value) if name in FLEET_FLOAT else str(value)
+        except (TypeError, ValueError):
+            raise BadRequest("{} 값이 올바르지 않습니다".format(key))
+    params = FleetParams(**kwargs)
+    try:
+        params.validate()
+    except ValueError as exc:
+        raise BadRequest(str(exc))
+    return params
+
+
+def job_fleet(p):
+    params = fleet_params(p)
+    reset = p.get("reset", True) not in (False, "false", "0", 0)
+    concurrency = int(p.get("concurrency") or 8)
+    if not 1 <= concurrency <= 64:
+        raise BadRequest("concurrency는 1~64")
+
+    def fn(job):
+        global LAST_FLEET
+        mark_fleet_stale("새 차량군 전송으로 DB가 바뀌었습니다")
+        if reset:
+            truncated = dbreset.reset()
+            job.log("DB 초기화 (이전 결과 {}건, 생산 이력 {}건)".format(
+                truncated.get("diagnostic_result", 0), truncated.get("vehicle_part", 0)))
+        else:
+            job.log("초기화 없이 실행: 기존 데이터가 남아 있으면 정답 비교가 맞지 않을 수 있습니다")
+
+        def progress(rep):
+            job.progress = {"done": rep.done, "total": rep.total}
+
+        summary = run_fleet(params, gateway_url=p.get("gatewayUrl") or GATEWAY_URL, concurrency=concurrency,
+                            on_log=job.log, on_progress=progress, stop_event=job.stop_event)
+        prod = summary["production"]
+        job.log("생산 이력 rows={rows} batches={batches} inserted={inserted} updated={updated} unchanged={unchanged}"
+                .format(**prod))
+        sim = summary.get("simulation")
+        if sim:
+            for kind, statuses in sorted(sim["byKind"].items()):
+                job.log("  진단 {:<9} {}".format(kind, statuses))
+            job.log("저장 기대 {}건, 기대와 다른 응답 {}건".format(sim["expectedResults"], sim["unexpectedCount"]))
+        summary["reset"] = reset
+        if job.stop_event.is_set():
+            summary["stale"] = "전송을 중단해 정답과 저장 데이터가 다릅니다"
+        elif not summary["ok"]:
+            summary["stale"] = "전송이 끝까지 성공하지 않아 정답과 저장 데이터가 다릅니다"
+        LAST_FLEET = summary
+        if summary.get("stale"):
+            job.log("✘ " + summary["stale"])
+        else:
+            exp = summary["expected"]["totals"]
+            job.log("정답: 고장 차량 {} / 진단 차량 {} · 기간 {from} ~ {to}".format(
+                exp["faultVehicles"], exp["diagnosedVehicles"], **summary["window"]))
+        return {"fleet": summary, "passed": summary["ok"],
+                "error": summary.get("stale") if not summary["ok"] else None}
+    return "fleet", "차량군 {}대 · 결함 {}".format(params.vehicles, params.defect_lot), fn
+
+
 def job_service(name, action, naive=False):
     if action == "build":
         def fn(job):
@@ -264,6 +346,8 @@ class Handler(SimpleHTTPRequestHandler):
             return 200, scenarios.catalog()
         if key == ("GET", "history"):
             return 200, JOBS.history
+        if key == ("GET", "fleet/last"):
+            return 200, LAST_FLEET
         if key == ("GET", "jobs/current"):
             job = JOBS.current
             return 200, job.view(int(query.get("since", 0))) if job else None
@@ -281,35 +365,46 @@ class Handler(SimpleHTTPRequestHandler):
                     [i for i in ids if i in scenarios.BY_ID])
             elif kind == "simulate":
                 spec = job_simulate(body.get("params") or {})
+            elif kind == "fleet":
+                spec = job_fleet(body.get("params") or {})
             elif kind == "service":
                 spec = job_service(body.get("name"), body.get("action"), bool(body.get("naive")))
             else:
-                raise BadRequest("type은 scenario|simulate|service")
-            return 202, JOBS.start(*spec).view()
+                raise BadRequest("type은 scenario|simulate|fleet|service")
+            job = JOBS.start(*spec)
+            if kind in ("scenario", "simulate"):
+                mark_fleet_stale("{} 실행 후 DB가 바뀌었습니다".format(job.title))
+            return 202, job.view()
         if key == ("POST", "fault"):
             body = self._body()
             return 200, fault.set_fault(body.get("mode", "NONE"), body.get("holdMs"))
         if key == ("POST", "reset"):
             if JOBS.busy():
                 raise Conflict("작업 실행 중에는 초기화할 수 없습니다")
-            return 200, dbreset.reset()
+            truncated = dbreset.reset()
+            mark_fleet_stale("DB 초기화 후 데이터가 없습니다")
+            return 200, truncated
         if key == ("GET", "reconcile"):
             rep = reconcile.reconcile(mode=query.get("mode", "standard"),
                                       allow_dead=query.get("allowDead") == "true",
                                       expect_results=int(query["expect"]) if query.get("expect") else None)
             return 200, rep
-        if key == ("GET", "logs") and len(parts) == 2:
+        if method == "GET" and parts[:1] == ["logs"] and len(parts) == 2:
             if parts[1] not in services.SERVICES:
                 raise BadRequest("unknown service")
             return 200, {"name": parts[1], "text": services.tail(parts[1], int(query.get("lines", 120)))}
         if parts and parts[0] == "ops":
-            return self._ops(method, parts[1:], query)
+            return self._relay("/ops/", method, parts[1:], query)
+        if parts and parts[0] == "trace":
+            if method != "GET":
+                raise BadRequest("추적 API는 GET만 지원합니다")
+            return self._relay("/api/v1/trace/", method, parts[1:], query)
         return 404, {"error": "not found"}
 
-    def _ops(self, method, rest, query):
-        """gateway 운영 API 중계. 응답 상태와 본문을 그대로 돌려준다."""
+    def _relay(self, prefix, method, rest, query):
+        """gateway API 중계. 응답 상태와 본문을 그대로 돌려준다."""
         base = query.pop("gateway", None) or GATEWAY_URL
-        path = "/ops/" + "/".join(urllib.parse.quote(p) for p in rest)
+        path = prefix + "/".join(urllib.parse.quote(p) for p in rest)
         if query:
             path += "?" + urllib.parse.urlencode(query)
         if method == "POST":
