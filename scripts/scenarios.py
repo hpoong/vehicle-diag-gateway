@@ -1,4 +1,4 @@
-"""장애 시나리오 실행기. 실제 프로세스·실제 HTTP·실제 DB로 S1~S12를 재현하고 대조로 판정한다.
+"""장애 시나리오 실행기. 실제 프로세스·실제 HTTP·실제 DB로 S1~S12와 T1을 재현하고 대조로 판정한다.
 
 통합 테스트(DeliveryScenarioIT 등)는 같은 규칙을 한 JVM 안에서 흉내 내지만,
 여기서는 gateway를 실제로 SIGKILL·SIGSTOP 하고 두 번째 gateway 프로세스를 띄운다.
@@ -20,6 +20,9 @@ from scripts.common import GATEWAY_DSN, GATEWAY_URL, RECEIVER_DSN, connect, http
 from scripts.reconcile import line, reconcile
 from simulator.payloads import build_plan
 from simulator.sender import send_plan
+from simulator.fleet import FleetParams, STORED_KINDS, run_fleet
+from simulator.payloads import SendItem, SendPlan
+from urllib.parse import urlencode
 
 
 class Stopped(Exception):
@@ -35,6 +38,7 @@ class Context:
         self.step = None
         self.simulation = None
         self.reconcile = None
+        self.trace = None
         self._on_log = on_log
         self._stop = stop_event
 
@@ -138,6 +142,11 @@ def prepare(ctx, gateway2=False, naive=False):
     truncated = dbreset.reset()
     ctx.log("DB 초기화 (이전 결과 {}건, 수신 {}건)".format(truncated["diagnostic_result"],
                                                      truncated["received_event"]))
+    required = {"vehicle_part", "campaign_vehicle", "campaign", "received_campaign_vehicle", "received_campaign"}
+    if not required.issubset(truncated):
+        raise RuntimeError("v2 DB 초기화 테이블이 누락되었습니다")
+    ctx.log("v2 DB 초기화: " + ", ".join(sorted(required)))
+    return truncated
 
 
 def simulate(ctx, **kwargs):
@@ -318,6 +327,77 @@ def s12(ctx):
         services.start("receiver")
 
 
+def fleet(ctx, return_fleet=False, **kwargs):
+    result = run_fleet(FleetParams(**kwargs), on_log=ctx.log, return_fleet=return_fleet, stop_event=ctx._stop)
+    summary = result[0] if return_fleet else result
+    ctx.simulation = summary.get("simulation")
+    ctx.check("생산 이력 전송 성공", summary["production"]["ok"], summary["production"])
+    if not summary["production"]["ok"]:
+        raise RuntimeError("생산 이력 실패: {}".format(summary["production"]))
+    ctx.check("차량군 진단 응답 코드가 기대와 일치", summary["simulation"]["ok"], summary["simulation"]["byKind"])
+    return result
+
+
+def trace_lots(window, ecu="TCM", dtc="P0700"):
+    return http("GET", GATEWAY_URL + "/api/v1/trace/lots?" + urlencode(
+        {"ecuId": ecu, "dtcCode": dtc, "from": window["from"], "to": window["to"]}))
+
+
+def t1(ctx):
+    prepare(ctx)
+    ctx.begin("결함 LOT 차량군 전송")
+    summary, generated = fleet(ctx, return_fleet=True, vehicles=300, lots=6, defect_lot="L-2403",
+                               defect_rate=0.4, base_rate=0.02, unknown_lot_rate=0.03, replace_rate=0.05,
+                               no_history_rate=0.01, diag_per_vehicle=2, duplicate_rate=0.3, seed=42)
+    drain(ctx, 300)
+    ctx.begin("역추적 vs 시뮬레이터 정답")
+    response = trace_lots(summary["window"])
+    ctx.check("역추적 200", response.status == 200)
+    if response.status != 200:
+        raise RuntimeError("역추적 실패: {}".format(response.body))
+    data, expected = response.data(), summary["expected"]
+    api = {row["lotNo"]: row for row in data["lots"]}
+    exp = {row["lotNo"]: row for row in expected["lots"]}
+    fields = ("faultVehicles", "diagnosedVehicles", "installedVehicles")
+    matched, differences = 0, []
+    for lot in sorted(api.keys() | exp.keys()):
+        a, e = api.get(lot, {}), exp.get(lot, {})
+        if lot in api and lot in exp and all(a[k] == e[k] for k in fields):
+            matched += 1
+        else:
+            differences.append({"lotNo": lot, "api": a, "expected": e})
+    ctx.check("LOT별 고장·진단·장착 차량 = 정답 ({}/{})".format(matched, len(exp)),
+              api.keys() == exp.keys() and matched == len(exp), differences)
+    unattributed_match = sum(data["unattributed"][key] == expected["unattributed"][key]
+                             for key in ("unknownLot", "noHistory", "ambiguous"))
+    ctx.check("미귀속·합계 = 정답", data["unattributed"] == expected["unattributed"] and data["totals"] == expected["totals"],
+              {"api": data["totals"], "expected": expected["totals"]})
+    top_lot = data["lots"][0]["lotNo"] if data["lots"] else None
+    ctx.check("결함 LOT 1위", top_lot == "L-2403", "topLot={}".format(top_lot))
+    ctx.begin("재전송해도 숫자 불변 (T-불변식)")
+    with connect(GATEWAY_DSN) as conn, conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM diagnostic_result")
+        before = cur.fetchone()[0]
+    replay = SendPlan(generated.run_id, [SendItem(1, "duplicate", item.payload)
+                      for item in generated.plan.items if item.kind in STORED_KINDS], generated.plan.vehicles)
+    replay_report = send_plan(replay, concurrency=8, stop_event=ctx._stop).to_dict()
+    with connect(GATEWAY_DSN) as conn, conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM diagnostic_result")
+        after = cur.fetchone()[0]
+    repeated = trace_lots(summary["window"])
+    ctx.check("재전송 전부 200·저장 건수와 추적 결과 불변", replay_report["ok"] and before == after
+              and repeated.status == 200 and repeated.data() == data, "results={}→{}".format(before, after))
+    ctx.trace = {"window": summary["window"],
+                 "lots": [{"lotNo": lot, "api": {k: api.get(lot, {}).get(k) for k in fields},
+                           "expected": exp.get(lot)} for lot in sorted(api.keys() | exp.keys())],
+                 "unattributed": {"api": data["unattributed"], "expected": expected["unattributed"]},
+                 "totals": {"api": data["totals"], "expected": expected["totals"]}, "topLot": top_lot}
+    ctx.log("TRACE_RESULT scenario=T1 vehicles=300 lots=6 from={from} to={to} lotMatch={}/{} unattributedMatch={}/3 totals={}/{} defectLot=L-2403 topLot={}".format(
+                matched, len(exp), unattributed_match, data["totals"]["faultVehicles"],
+                data["totals"]["diagnosedVehicles"], top_lot, **summary["window"]))
+    judge(ctx, "T1", expect_results=summary["simulation"]["expectedResults"])
+
+
 SCENARIOS = [
     {"id": "S1", "title": "단말 재전송", "fn": s1, "fault": "NONE",
      "desc": "결과의 30%를 같은 내용으로 1~2회 다시 보낸다.", "expect": "재전송은 200, 저장 건수 = 고유 결과 수"},
@@ -345,6 +425,9 @@ SCENARIOS = [
     {"id": "S12", "title": "중복 검사 없는 비교", "fn": s12, "fault": "naive + DROP_AFTER_COMMIT",
      "desc": "receiver를 중복 검사 없는 비교 모드로 띄우고 S5를 반복한다.",
      "expect": "(대조군) 품질 건 중복 발생 dup1 > 0"},
+    {"id": "T1", "title": "추적 정확도", "fn": t1, "fault": "NONE",
+     "desc": "결함 LOT(L-2403) 차량군 300대를 재전송 30%와 함께 보내고 역추적한다.",
+     "expect": "LOT별 고장·진단 차량 수가 시뮬레이터 정답과 같음, 결함 LOT 1위, 재전송 후 불변"},
 ]
 BY_ID = {s["id"]: s for s in SCENARIOS}
 
@@ -373,7 +456,7 @@ def run(scenario_id, ctx):
     passed = error is None and bool(ctx.checks) and all(c["ok"] for c in ctx.checks)
     return {"scenario": scenario_id, "title": scenario["title"], "passed": passed, "error": error,
             "elapsedSec": round(time.time() - started, 1), "checks": ctx.checks,
-            "simulation": ctx.simulation, "reconcile": ctx.reconcile}
+            "simulation": ctx.simulation, "reconcile": ctx.reconcile, "trace": ctx.trace}
 
 
 def main(argv=None):

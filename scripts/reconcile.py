@@ -1,7 +1,7 @@
 """gateway DB와 receiver DB를 직접 조회해 누락·중복을 판정한다.
 
 판정 항목은 통합 테스트의 ReconcileAssertions(I1~I6)와 같다.
-  I1 결과 수 = outbox 수
+  I1 결과 수 = 진단 outbox 수
   I2 PENDING + SENT + DEAD = outbox 수
   I3 SENT인데 receiver에 없는 이벤트 0건
   I4 (PENDING 0일 때) 누락 0건, SENT가 아닌데 receiver에 반영된 이벤트 0건
@@ -42,19 +42,21 @@ def reconcile(mode="standard", allow_dead=False, expect_results=None):
     naive = mode == "naive"
     with connect(GATEWAY_DSN) as g, connect(RECEIVER_DSN) as r:
         results = _one(g, "SELECT count(*) FROM diagnostic_result")
+        diagnostic_outbox = _one(g, "SELECT count(*) FROM outbox_event WHERE event_type='DIAGNOSTIC_RESULT'")
+        diagnostic_pending = _one(g, "SELECT count(*) FROM outbox_event WHERE status='PENDING' AND event_type='DIAGNOSTIC_RESULT'")
         status = dict(_rows(g, "SELECT status, count(*) FROM outbox_event GROUP BY status"))
         outbox = sum(status.values())
         pending, sent, dead = (status.get(s, 0) for s in ("PENDING", "SENT", "DEAD"))
         received_ids = _ids(r, "SELECT event_id::text FROM received_event")
-        sent_ids = _ids(g, "SELECT event_id::text FROM outbox_event WHERE status='SENT'")
-        dead_ids = _ids(g, "SELECT event_id::text FROM outbox_event WHERE status='DEAD'")
+        sent_ids = _ids(g, "SELECT event_id::text FROM outbox_event WHERE status='SENT' AND event_type='DIAGNOSTIC_RESULT'")
+        dead_ids = _ids(g, "SELECT event_id::text FROM outbox_event WHERE status='DEAD' AND event_type='DIAGNOSTIC_RESULT'")
 
         v = {}
 
         def verdict(key, ok, detail):
             v[key] = {"status": "PASS" if ok else "FAIL", "detail": detail}
 
-        verdict("I1", results == outbox, "results={} outbox={}".format(results, outbox))
+        verdict("I1", results == diagnostic_outbox, "results={} diagnosticOutbox={}".format(results, diagnostic_outbox))
         verdict("I2", pending + sent + dead == outbox, "status total={}".format(pending + sent + dead))
         missing = sent_ids - received_ids
         if naive:
@@ -62,8 +64,8 @@ def reconcile(mode="standard", allow_dead=False, expect_results=None):
                 v[key] = {"status": "SKIP", "detail": "NAIVE"}
         else:
             verdict("I3", not missing, _detail(missing))
-            if pending > 0:
-                v["I4"] = {"status": "SKIP", "detail": "PENDING={}".format(pending)}
+            if diagnostic_pending > 0:
+                v["I4"] = {"status": "SKIP", "detail": "PENDING={}".format(diagnostic_pending)}
             else:
                 unexpected = received_ids - sent_ids - (dead_ids if allow_dead else set())
                 verdict("I4", not missing and not unexpected,
@@ -71,7 +73,7 @@ def reconcile(mode="standard", allow_dead=False, expect_results=None):
             pairs = dict(_rows(g, """
                 SELECT ob.event_id::text, coalesce(sum(cardinality(o.dtc_codes)), 0)
                 FROM outbox_event ob LEFT JOIN ecu_observation o ON o.result_id = ob.result_id
-                GROUP BY ob.event_id"""))
+                WHERE ob.event_type='DIAGNOSTIC_RESULT' GROUP BY ob.event_id"""))
             mismatches = set()
             for event_id, case_count, cases in _rows(r, """
                     SELECT r.event_id::text, r.case_count, count(c.id)

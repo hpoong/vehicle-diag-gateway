@@ -12,6 +12,10 @@ from simulator.sender import send_plan
 
 
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["fleet"]:
+        from simulator.fleet import fleet_main
+        return fleet_main(argv[1:])
     p = argparse.ArgumentParser(prog="python3 -m simulator", description="가상 진단 단말: gateway로 진단 결과 전송")
     p.add_argument("--count", type=int, default=50, help="고유 진단 결과 수 (기본 50)")
     p.add_argument("--duplicate-rate", type=float, default=0.0, help="같은 내용 재전송 비율 → 200 (S1)")

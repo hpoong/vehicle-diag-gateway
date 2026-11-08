@@ -9,9 +9,9 @@ import sys
 
 from scripts.common import GATEWAY_DSN, RECEIVER_DSN, connect
 
-GATEWAY_TABLES = ("ops_action_log", "delivery_attempt", "outbox_event", "vehicle_ecu_latest",
+GATEWAY_TABLES = ("ops_action_log", "delivery_attempt", "outbox_event", "campaign_vehicle", "campaign", "vehicle_part", "vehicle_ecu_latest",
                   "ecu_observation", "diagnostic_result")
-RECEIVER_TABLES = ("quality_case", "quality_case_naive", "received_event")
+RECEIVER_TABLES = ("received_campaign_vehicle", "received_campaign", "quality_case", "quality_case_naive", "received_event")
 
 
 def reset():

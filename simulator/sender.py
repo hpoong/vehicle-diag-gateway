@@ -97,3 +97,30 @@ def send_plan(plan, gateway_url=GATEWAY_URL, concurrency=8, rate_per_sec=0.0,
                 break
     report.finished = time.time()
     return report
+
+
+def send_parts(batches, gateway_url=GATEWAY_URL, source="OEM-SIM", run_id=None, on_log=None, stop_event=None):
+    """차량별 이력 그룹을 유지한 배치를 순서대로 반영하고, 실패하면 즉시 중단한다."""
+    import uuid
+    run_id = run_id or "p" + uuid.uuid4().hex
+    report = {"rows": sum(map(len, batches)), "batches": len(batches), "batchSizes": list(map(len, batches)),
+              "byStatus": {}, "received": 0, "inserted": 0, "updated": 0, "unchanged": 0, "ok": False}
+    for index, rows in enumerate(batches, 1):
+        if stop_event is not None and stop_event.is_set():
+            report["stopped"] = True
+            return report
+        batch_id = "{}-p{:03d}".format(run_id, index)
+        response = http("POST", gateway_url.rstrip("/") + "/api/v1/production/vehicle-parts",
+                        {"source": source, "batchId": batch_id, "parts": rows}, headers={"X-Request-Id": batch_id})
+        status = str(response.status)
+        report["byStatus"][status] = report["byStatus"].get(status, 0) + 1
+        if on_log:
+            on_log("생산 이력 batch={} rows={} status={}".format(index, len(rows), status))
+        if response.status != 200:
+            report.update(failedBatch=index, status=response.status, body=response.body)
+            return report
+        data = response.data()
+        for key in ("received", "inserted", "updated", "unchanged"):
+            report[key] += data[key]
+    report["ok"] = report["received"] == report["rows"]
+    return report
